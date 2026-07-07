@@ -1,22 +1,49 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Fallback values
+// Fallback values representing the active project
 const FALLBACK_URL = 'https://ugvgogigsvcmynpinhtg.supabase.co';
-const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVndmdvZ2lnc3ZjbXlucGluaHRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTY4ODQwNTUsImV4cCI6MjAzMjQ1OTk0OH0.ThisIsNotARealKeyJustToPreventCrash'; // This is a fake key but structured as JWT so createClient won't crash the entire app
+const FALLBACK_KEY = 'sb_publishable_OGph_ONuJ-puNBtvE0An3g_03FTXGgH';
 
-let url = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
-let key = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
+// Initialize variables using both VITE_ prefixed and direct environment variables
+export const SUPABASE_URL = 
+  import.meta.env.VITE_SUPABASE_URL || 
+  import.meta.env.SUPABASE_URL || 
+  FALLBACK_URL;
 
-// Ensure key is somewhat valid looking for Supabase
-if (!key.startsWith('eyJ') && !key.startsWith('sb_publishable_')) {
-  console.error("Invalid Supabase Key. Using dummy key to prevent crash.");
-  key = FALLBACK_KEY;
-}
+export const SUPABASE_PUBLISHABLE_KEY = 
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
+  import.meta.env.SUPABASE_PUBLISHABLE_KEY || 
+  import.meta.env.SUPABASE_ANON_KEY || 
+  FALLBACK_KEY;
 
-try {
-  new URL(url);
-} catch (e) {
-  url = FALLBACK_URL;
-}
+// Check configuration validity
+export const isConfigValid = (() => {
+  try {
+    if (!SUPABASE_URL || !SUPABASE_URL.startsWith('https://') || SUPABASE_URL.includes('YOUR_')) {
+      return false;
+    }
+    if (!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')) {
+      return false;
+    }
+    // Must be either standard JWT (eyJ) or the modern publishable key format (sb_publishable_)
+    if (!SUPABASE_PUBLISHABLE_KEY.startsWith('eyJ') && !SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_')) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+})();
 
-export const supabase = createClient(url, key);
+// Initialize the Supabase client safely
+const safeUrl = isConfigValid ? SUPABASE_URL : FALLBACK_URL;
+const safeKey = isConfigValid ? SUPABASE_PUBLISHABLE_KEY : FALLBACK_KEY;
+
+export const supabase = createClient(safeUrl, safeKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});

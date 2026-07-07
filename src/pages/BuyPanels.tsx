@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Search, Filter, Shield } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Search, Filter, Shield, GitFork, ChevronDown, Check, Smartphone, Laptop, Cpu, Globe, Key } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { useScrollTop } from '../hooks';
 import { supabase } from '../lib/supabase';
@@ -10,11 +10,12 @@ import { NEW_PRODUCTS } from '../data/products';
 export function BuyPanels() {
   useScrollTop();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const filters = ['All', 'Root', 'NonRoot', 'iOS', 'PC'];
+  const filters = ['All', 'Root', 'Non-root', 'ISO', 'PC'];
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -23,11 +24,29 @@ export function BuyPanels() {
           .from('products')
           .select(`*, plans (*)`);
           
+        let merged = [...NEW_PRODUCTS];
+        
         if (data && data.length > 0) {
-          setProducts(data);
-        } else {
-          setProducts(NEW_PRODUCTS); // Fallback to hardcoded list
+          data.forEach(dbProduct => {
+            const index = merged.findIndex(p => p.id === dbProduct.id);
+            const dbPlans = dbProduct.plans || [];
+            
+            if (index !== -1) {
+              const localProduct = merged[index];
+              merged[index] = {
+                ...localProduct,
+                ...dbProduct,
+                plans: dbPlans.length > 0 ? dbPlans : localProduct.plans
+              };
+            } else {
+              merged.push({
+                ...dbProduct,
+                plans: dbPlans
+              });
+            }
+          });
         }
+        setProducts(merged);
       } catch (e) {
         setProducts(NEW_PRODUCTS);
       }
@@ -38,10 +57,22 @@ export function BuyPanels() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = (product.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            (product.description || '').toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesFilter = activeFilter === 'All' || product.category === activeFilter;
+      let matchesFilter = false;
+      if (activeFilter === 'All') {
+        matchesFilter = true;
+      } else {
+        const cat = (product.category || '').toLowerCase();
+        if (activeFilter === 'Non-root') {
+          matchesFilter = cat === 'nonroot' || cat === 'non-root';
+        } else if (activeFilter === 'ISO') {
+          matchesFilter = cat === 'ios' || cat === 'iso';
+        } else {
+          matchesFilter = cat === activeFilter.toLowerCase();
+        }
+      }
 
       return matchesSearch && matchesFilter;
     });
@@ -92,28 +123,65 @@ export function BuyPanels() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <div className="flex items-center gap-2 text-gray-500 mr-2">
-              <Filter className="w-4 h-4" /> <span className="text-sm font-medium">Filter:</span>
-            </div>
-            {filters.map(filter => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  activeFilter === filter
-                    ? 'bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]'
-                    : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700 hover:text-white'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
+          {/* Branch Selector Dropdown */}
+          <div className="relative max-w-md mx-auto text-center z-30">
+            <button
+              onClick={() => setIsBranchOpen(!isBranchOpen)}
+              className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-900 border border-gray-800 hover:border-orange-500/50 rounded-xl text-white font-bold transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] focus:outline-none"
+            >
+              <div className="flex items-center gap-3">
+                <GitFork className="w-5 h-5 text-orange-500" />
+                <span className="text-sm tracking-wide">BRANCH: <span className="text-orange-500 uppercase">{activeFilter}</span></span>
+              </div>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isBranchOpen ? 'rotate-180 text-orange-500' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {isBranchOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 right-0 mt-2 bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-[0_15px_30px_rgba(0,0,0,0.8)] z-40 divide-y divide-gray-900"
+                >
+                  {filters.map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => {
+                        setActiveFilter(filter);
+                        setIsBranchOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-5 py-4 text-sm font-semibold transition-all ${
+                        activeFilter === filter
+                          ? 'bg-orange-500/10 text-orange-500'
+                          : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {filter === 'All' && <Globe className="w-4 h-4 shrink-0" />}
+                        {filter === 'Root' && <Cpu className="w-4 h-4 shrink-0" />}
+                        {filter === 'Non-root' && <Smartphone className="w-4 h-4 shrink-0" />}
+                        {filter === 'ISO' && <Key className="w-4 h-4 shrink-0" />}
+                        {filter === 'PC' && <Laptop className="w-4 h-4 shrink-0" />}
+                        <span>{filter}</span>
+                      </div>
+                      {activeFilter === filter && <Check className="w-4 h-4 text-orange-500" />}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-20">
+            <span className="inline-block w-8 h-8 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+            <p className="text-gray-500 mt-4 text-sm">Loading gaming panels...</p>
+          </div>
+        ) : filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredProducts.map(product => (
               <ProductCard key={product.id} product={product} />
@@ -123,12 +191,12 @@ export function BuyPanels() {
           <div className="text-center py-20">
             <Shield className="w-16 h-16 text-gray-800 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">No products found</h3>
-            <p className="text-gray-500">Try adjusting your search or filters.</p>
+            <p className="text-gray-500">Try adjusting your search or selected branch.</p>
             <button 
               onClick={() => {setSearchQuery(''); setActiveFilter('All');}}
               className="mt-6 text-orange-500 hover:text-orange-400 font-medium"
             >
-              Clear all filters
+              Clear filters
             </button>
           </div>
         )}

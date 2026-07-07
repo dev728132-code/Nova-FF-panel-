@@ -240,6 +240,7 @@ export function Checkout() {
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${upiId}&pn=FF%20Store&am=${selectedPlan.price}&cu=INR`} 
                     alt="UPI QR Code" 
                     className="w-48 h-48"
+                    referrerPolicy="no-referrer"
                   />
                 </div>
                 <p className="text-xs text-gray-500 relative z-10">Please pay exactly ₹{selectedPlan.price}</p>
@@ -256,6 +257,9 @@ export function Checkout() {
                     className="w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     required
                   />
+                  <p className="text-xs text-orange-500/80 mt-1.5 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> This field is safe. All transaction details are encrypted and verified under our strict privacy policy.
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -310,6 +314,9 @@ export function Checkout() {
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
               </label>
+              <p className="text-xs text-orange-500/80 mt-2 flex items-center gap-1 justify-center">
+                <ShieldCheck className="w-3.5 h-3.5" /> This field is safe. Uploaded images are private and verified securely under our good policies.
+              </p>
 
               <button
                 onClick={handleConfirm}

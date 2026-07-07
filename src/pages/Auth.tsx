@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Lock, Mail, User, Phone, ArrowRight, Crosshair } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Lock, Mail, User, Phone, ArrowRight, Crosshair, AlertTriangle } from 'lucide-react';
+import { supabase, isConfigValid } from '../lib/supabase';
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Auth() {
   useScrollTop();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Form State
@@ -31,9 +33,16 @@ export function Auth() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
-      if (isLogin) {
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        setSuccessMessage('Password reset link sent! Please check your email inbox.');
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -53,7 +62,7 @@ export function Auth() {
         if (error) throw error;
         
         if (!data.session) {
-          setError('Account created! Please check your email to verify your account.');
+          setSuccessMessage('Account created! Please check your email to verify your account.');
         }
       }
     } catch (err: any) {
@@ -77,22 +86,47 @@ export function Auth() {
             <Crosshair className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-black text-white mb-2">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {isForgotPassword 
+              ? 'Reset Password' 
+              : isLogin 
+                ? 'Welcome Back' 
+                : 'Create Account'}
           </h1>
           <p className="text-gray-400 text-sm">
-            {isLogin ? 'Enter your details to access your panels' : 'Register to get access to premium FF panels'}
+            {isForgotPassword
+              ? 'Enter your email address to receive a recovery link'
+              : isLogin 
+                ? 'Enter your details to access your panels' 
+                : 'Register to get access to premium FF panels'}
           </p>
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-3xl p-8">
+          {/* Suppress crashes with graceful configurations check warning */}
+          {!isConfigValid && (
+            <div className="mb-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400 text-xs font-medium leading-relaxed flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0" />
+              <div>
+                <strong className="block text-sm text-orange-400 mb-0.5">Configuration Warning</strong>
+                An invalid Supabase API Key was detected. The application is running in fallback security mode.
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-medium text-center">
               {error}
             </div>
           )}
 
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm font-medium text-center">
+              {successMessage}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
+            {!isLogin && !isForgotPassword && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Full Name</label>
@@ -146,23 +180,40 @@ export function Auth() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-500" />
+            {!isForgotPassword && (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-400">Password</label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsForgotPassword(true);
+                        setError(null);
+                        setSuccessMessage(null);
+                      }}
+                      className="text-xs text-orange-500 hover:text-orange-400 transition-colors font-semibold"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
                 </div>
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3 bg-black border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                  minLength={6}
-                />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full pl-11 pr-4 py-3 bg-black border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                    placeholder="••••••••"
+                    minLength={6}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <button
               type="submit"
@@ -177,26 +228,46 @@ export function Auth() {
                 <span className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  {isLogin ? 'Sign In' : 'Create Account'} <ArrowRight className="w-5 h-5" />
+                  {isForgotPassword 
+                    ? 'Send Link' 
+                    : isLogin 
+                      ? 'Sign In' 
+                      : 'Create Account'} <ArrowRight className="w-5 h-5" />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-8 text-center">
-            <p className="text-gray-400 text-sm">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <div className="mt-8 text-center space-y-3">
+            {isForgotPassword ? (
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin(!isLogin);
+                  setIsForgotPassword(false);
+                  setIsLogin(true);
                   setError(null);
+                  setSuccessMessage(null);
                 }}
-                className="text-orange-500 font-bold hover:text-orange-400 transition-colors"
+                className="text-orange-500 font-bold hover:text-orange-400 transition-colors text-sm"
               >
-                {isLogin ? 'Sign Up' : 'Sign In'}
+                Back to Sign In
               </button>
-            </p>
+            ) : (
+              <p className="text-gray-400 text-sm">
+                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLogin(!isLogin);
+                    setError(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-orange-500 font-bold hover:text-orange-400 transition-colors"
+                >
+                  {isLogin ? 'Sign Up' : 'Sign In'}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </motion.div>

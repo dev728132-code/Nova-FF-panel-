@@ -1,35 +1,10 @@
-import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, Users, Star, MessageSquare } from 'lucide-react';
-import { ProductCard } from '../components/ProductCard';
 import { useScrollTop } from '../hooks';
-import { supabase } from '../lib/supabase';
-import { Product } from '../types';
-import { NEW_PRODUCTS } from '../data/products';
 
 export function Home() {
   useScrollTop();
-  const [products, setProducts] = useState<Product[]>([]);
-  
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const { data } = await supabase.from('products').select('*, plans(*)').limit(6);
-        if (data && data.length > 0) {
-          setProducts(data);
-        } else {
-          setProducts(NEW_PRODUCTS.slice(0, 6));
-        }
-      } catch (e) {
-        setProducts(NEW_PRODUCTS.slice(0, 6));
-      }
-    };
-    fetchProducts();
-  }, []);
-
-  const featuredProducts = products.slice(0, 3);
-  const popularProducts = products.slice(3, 6);
 
   return (
     <div className="pt-16 min-h-screen">
@@ -75,7 +50,7 @@ export function Home() {
                 to="/buy"
                 className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-105 shadow-[0_0_30px_rgba(249,115,22,0.3)]"
               >
-                Browse Panels <ArrowRight className="w-5 h-5" />
+                Feature Panel <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
                 to="/support"
@@ -88,29 +63,6 @@ export function Home() {
         </div>
       </section>
 
-      {/* Featured Panels */}
-      <section className="py-20 bg-black relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-4">
-                Featured <span className="text-orange-500">Panels</span>
-              </h2>
-              <p className="text-gray-400 max-w-xl text-lg">Our top-rated and most powerful tools chosen by professional players.</p>
-            </div>
-            <Link to="/buy" className="text-orange-500 hover:text-orange-400 font-semibold flex items-center gap-2 transition-colors">
-              View All <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Why Choose Us */}
       <section className="py-24 bg-gray-900 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -118,25 +70,27 @@ export function Home() {
             <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-4">
               Why Choose <span className="text-orange-500">Us?</span>
             </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto text-lg">We provide the highest quality and most secure mods in the market.</p>
+            <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+              We believe we should use good things. We provide the highest quality and most secure mods in the market, ensuring that everyone should be safe.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
                 icon: <ShieldCheck className="w-8 h-8 text-orange-500" />,
-                title: '100% Undetected',
-                desc: 'Our dedicated security bypass systems ensure your account remains safe from bans.'
+                title: '100% Undetected & Safe',
+                desc: 'Everyone should be safe. Our advanced bypass systems ensure your gaming account remains completely protected from restrictions under our good policies.'
               },
               {
                 icon: <Zap className="w-8 h-8 text-orange-500" />,
-                title: 'Instant Delivery',
-                desc: 'Get immediate access to your purchased panels right after payment confirmation.'
+                title: 'Good Policies & Systems',
+                desc: 'We should use good policies. We implement rigorous automated checks and customer-first safety protocols for instant verification.'
               },
               {
                 icon: <Users className="w-8 h-8 text-orange-500" />,
-                title: '24/7 Support',
-                desc: 'Our technical team is always ready to help you with setup and troubleshooting.'
+                title: 'Premium Quality Mods',
+                desc: 'We should use good things. Every single panel is carefully crafted, refined, and regularly updated with top-tier premium features.'
               }
             ].map((feature, idx) => (
               <motion.div
@@ -153,23 +107,6 @@ export function Home() {
                 <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
                 <p className="text-gray-400 leading-relaxed">{feature.desc}</p>
               </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Popular Products */}
-       <section className="py-20 bg-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-4">
-              Popular <span className="text-orange-500">Products</span>
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {popularProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </div>
