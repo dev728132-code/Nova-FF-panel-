@@ -4,30 +4,43 @@ import { createClient } from '@supabase/supabase-js';
 const FALLBACK_URL = 'https://ugvgogigsvcmynpinhtg.supabase.co';
 const FALLBACK_KEY = 'sb_publishable_OGph_ONuJ-puNBtvE0An3g_03FTXGgH';
 
-// Initialize variables using both VITE_ prefixed and direct environment variables
-export const SUPABASE_URL = 
-  import.meta.env.VITE_SUPABASE_URL || 
-  import.meta.env.SUPABASE_URL || 
-  FALLBACK_URL;
+// Get the URL safely. If the environment URL is invalid or is actually a key, use the fallback.
+const getSafeUrl = () => {
+  const envUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL;
+  if (envUrl && envUrl.startsWith('https://') && !envUrl.includes('YOUR_')) {
+    return envUrl;
+  }
+  return FALLBACK_URL;
+};
 
-export const SUPABASE_PUBLISHABLE_KEY = 
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
-  import.meta.env.SUPABASE_PUBLISHABLE_KEY || 
-  import.meta.env.SUPABASE_ANON_KEY || 
-  FALLBACK_KEY;
+// Get the publishable key safely. Only accept modern publishable format.
+const getSafeKey = () => {
+  const envKey = 
+    import.meta.env.VITE_SUPABASE_ANON_KEY || 
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
+    import.meta.env.SUPABASE_PUBLISHABLE_KEY || 
+    import.meta.env.SUPABASE_ANON_KEY;
 
-// Check configuration validity
+  if (envKey && envKey.startsWith('sb_publishable_') && !envKey.includes('YOUR_')) {
+    return envKey;
+  }
+  return FALLBACK_KEY;
+};
+
+export const SUPABASE_URL = getSafeUrl();
+export const SUPABASE_PUBLISHABLE_KEY = getSafeKey();
+
+// Check configuration validity: Only consider it invalid if we don't have a valid publishable key format
 export const isConfigValid = (() => {
   try {
-    if (!SUPABASE_URL || !SUPABASE_URL.startsWith('https://') || SUPABASE_URL.includes('YOUR_')) {
-      return false;
-    }
-    if (!SUPABASE_PUBLISHABLE_KEY || SUPABASE_PUBLISHABLE_KEY.includes('YOUR_')) {
-      return false;
-    }
-    // Must be either standard JWT (eyJ) or the modern publishable key format (sb_publishable_)
-    if (!SUPABASE_PUBLISHABLE_KEY.startsWith('eyJ') && !SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_')) {
+    const rawKey = 
+      import.meta.env.VITE_SUPABASE_ANON_KEY || 
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
+      import.meta.env.SUPABASE_PUBLISHABLE_KEY || 
+      import.meta.env.SUPABASE_ANON_KEY || 
+      FALLBACK_KEY;
+
+    if (!rawKey || rawKey.includes('YOUR_') || !rawKey.startsWith('sb_publishable_')) {
       return false;
     }
     return true;
@@ -36,11 +49,7 @@ export const isConfigValid = (() => {
   }
 })();
 
-// Initialize the Supabase client safely
-const safeUrl = isConfigValid ? SUPABASE_URL : FALLBACK_URL;
-const safeKey = isConfigValid ? SUPABASE_PUBLISHABLE_KEY : FALLBACK_KEY;
-
-export const supabase = createClient(safeUrl, safeKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

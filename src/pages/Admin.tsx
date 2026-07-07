@@ -16,7 +16,7 @@ export function Admin() {
 
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
 
-  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
+  const isOwner = user?.email === 'dev7287132@gmail.com';
 
   useEffect(() => {
     if (!user) {
