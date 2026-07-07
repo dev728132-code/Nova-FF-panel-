@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { useScrollTop } from '../hooks';
-import { Shield, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Clock, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function Admin() {
@@ -14,6 +14,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
+  const [adminTab, setAdminTab] = useState<'purchases' | 'funds'>('purchases');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
 
   const isOwner = user?.email === 'dev7287132@gmail.com';
@@ -101,12 +102,20 @@ export function Admin() {
     }
   };
 
-  const filteredOrders = orders.filter(order => {
+  const purchasesOrders = orders.filter(o => o.product_id !== 'wallet_fund_request');
+  const fundsOrders = orders.filter(o => o.product_id === 'wallet_fund_request');
+
+  const currentTabOrders = adminTab === 'purchases' ? purchasesOrders : fundsOrders;
+
+  const filteredOrders = currentTabOrders.filter(order => {
     if (filter === 'All') return true;
     return order.payment_status === filter;
   });
 
-  const pendingCount = orders.filter(o => o.payment_status === 'Pending').length;
+  const pendingPurchasesCount = purchasesOrders.filter(o => o.payment_status === 'Pending').length;
+  const pendingFundsCount = fundsOrders.filter(o => o.payment_status === 'Pending').length;
+  const pendingCount = adminTab === 'purchases' ? pendingPurchasesCount : pendingFundsCount;
+  const totalPendingCount = pendingPurchasesCount + pendingFundsCount;
 
   if (user && !isOwner) {
     return (
@@ -145,11 +154,51 @@ export function Admin() {
         <div className="flex items-center gap-3 mb-8">
           <Shield className="w-8 h-8 text-orange-500" />
           <h1 className="text-3xl font-black text-white">Admin Dashboard</h1>
-          {pendingCount > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-              {pendingCount} New Request{pendingCount > 1 ? 's' : ''}
+          {totalPendingCount > 0 && (
+            <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
+              {totalPendingCount} New Alert{totalPendingCount > 1 ? 's' : ''}
             </span>
           )}
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex border-b border-gray-800 mb-8 gap-6 text-sm">
+          <button
+            onClick={() => {
+              setAdminTab('purchases');
+              setFilter('Pending');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+              adminTab === 'purchases'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Shield className="w-4 h-4" /> Product Purchases
+            {pendingPurchasesCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                {pendingPurchasesCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setAdminTab('funds');
+              setFilter('Pending');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+              adminTab === 'funds'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Wallet className="w-4 h-4" /> Fund Requests
+            {pendingFundsCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                {pendingFundsCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="flex items-center gap-2 mb-6">
@@ -180,7 +229,9 @@ export function Admin() {
                 <tr className="border-b border-gray-800 bg-black/50">
                   <th className="p-4 text-sm font-semibold text-gray-400">Order ID</th>
                   <th className="p-4 text-sm font-semibold text-gray-400">Customer</th>
-                  <th className="p-4 text-sm font-semibold text-gray-400">Product</th>
+                  <th className="p-4 text-sm font-semibold text-gray-400">
+                    {adminTab === 'funds' ? 'Top-up Type' : 'Product'}
+                  </th>
                   <th className="p-4 text-sm font-semibold text-gray-400">Amount</th>
                   <th className="p-4 text-sm font-semibold text-gray-400">UTR / Details</th>
                   <th className="p-4 text-sm font-semibold text-gray-400">Date/Time</th>
@@ -192,7 +243,7 @@ export function Admin() {
                 {filteredOrders.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="p-8 text-center text-gray-500">
-                      No orders found.
+                      No {adminTab === 'funds' ? 'fund requests' : 'orders'} found.
                     </td>
                   </tr>
                 ) : (
@@ -208,8 +259,12 @@ export function Admin() {
                         <div className="text-xs text-gray-400">{order.customer_email || '-'}</div>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium text-white">{order.product_name || order.product_id}</div>
-                        <div className="text-xs text-orange-500">{order.plan_duration}</div>
+                        <div className="font-medium text-white">
+                          {adminTab === 'funds' ? 'Wallet Top-up' : (order.product_name || order.product_id)}
+                        </div>
+                        <div className="text-xs text-orange-500">
+                          {adminTab === 'funds' ? 'Wallet Deposit' : order.plan_duration}
+                        </div>
                       </td>
                       <td className="p-4 font-bold text-white">
                         ₹{order.amount}

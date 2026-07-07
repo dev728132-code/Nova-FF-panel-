@@ -33,7 +33,7 @@ export function OrderHistory() {
         if (error) throw error;
         
         if (mounted && data) {
-          setOrders(data);
+          setOrders(data.filter((o: any) => o.product_id !== 'wallet_fund_request'));
         }
       } catch (err) {
         console.error('Error fetching orders:', err);

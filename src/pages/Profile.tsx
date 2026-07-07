@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { User, Mail, Shield, Settings, LogOut, Smartphone, Key } from 'lucide-react';
+import { User, Mail, Shield, Settings, LogOut, Smartphone, Key, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Upload, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -14,7 +14,130 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
 
   // Stateful tabs
-  const [activeTab, setActiveTab] = useState<'personal' | 'security' | 'preferences'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'wallet' | 'security' | 'preferences'>('personal');
+
+  // Wallet state
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletTransactions, setWalletTransactions] = useState<any[]>([]);
+  const [walletLoading, setWalletLoading] = useState(true);
+  
+  // Add Funds form state
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositUtr, setDepositUtr] = useState('');
+  const [depositFile, setDepositFile] = useState<File | null>(null);
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [depositMessage, setDepositMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchWalletData = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('purchase_date', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        // Calculate approved deposits
+        const approvedDeposits = data
+          .filter((o: any) => o.product_id === 'wallet_fund_request' && o.payment_status === 'Verified')
+          .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+        // Calculate wallet purchases
+        const walletPurchases = data
+          .filter((o: any) => o.utr_number === 'wallet_payment')
+          .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+        setWalletBalance(approvedDeposits - walletPurchases);
+        
+        // Filter wallet transactions
+        const walletTx = data.filter((o: any) => o.product_id === 'wallet_fund_request' || o.utr_number === 'wallet_payment');
+        setWalletTransactions(walletTx);
+      }
+    } catch (err) {
+      console.error('Error fetching wallet data:', err);
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleDepositSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    const amountNum = parseFloat(depositAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setDepositMessage({ type: 'error', text: 'Please enter a valid amount greater than 0.' });
+      return;
+    }
+    
+    if (!depositUtr.trim()) {
+      setDepositMessage({ type: 'error', text: 'UTR / Transaction ID is required.' });
+      return;
+    }
+    
+    setIsDepositing(true);
+    setDepositMessage(null);
+    
+    try {
+      let screenshotUrl = '';
+      if (depositFile) {
+        const fileExt = depositFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('payment_screenshots')
+          .upload(filePath, depositFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('payment_screenshots')
+          .getPublicUrl(filePath);
+          
+        screenshotUrl = publicUrlData.publicUrl;
+      }
+      
+      const paymentDate = new Date().toISOString().split('T')[0];
+      const paymentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
+
+      const { error: insertError } = await supabase.from('orders').insert({
+        user_id: user.id,
+        product_id: 'wallet_fund_request',
+        product_name: 'Wallet Fund Request',
+        plan_duration: 'One-time',
+        amount: amountNum,
+        payment_status: 'Pending',
+        order_status: 'Pending',
+        expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        payment_screenshot_url: screenshotUrl || null,
+        utr_number: depositUtr.trim(),
+        payment_date: paymentDate,
+        payment_time: paymentTime,
+        customer_name: profile?.full_name || 'Anonymous User',
+        customer_email: user.email
+      });
+
+      if (insertError) throw insertError;
+
+      setDepositMessage({
+        type: 'success',
+        text: 'Fund request submitted successfully. Please wait while the admin verifies your payment.'
+      });
+      setDepositAmount('');
+      setDepositUtr('');
+      setDepositFile(null);
+      fetchWalletData();
+    } catch (err: any) {
+      console.error(err);
+      setDepositMessage({ type: 'error', text: err.message || 'Error submitting fund request.' });
+    } finally {
+      setIsDepositing(false);
+    }
+  };
 
   // Personal Info Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -59,6 +182,10 @@ export function Profile() {
     };
 
     fetchProfile();
+    fetchWalletData();
+
+    const interval = setInterval(fetchWalletData, 4000);
+    return () => clearInterval(interval);
   }, [user, authLoading, navigate]);
 
   const handleLogout = async () => {
@@ -168,13 +295,18 @@ export function Profile() {
               
               <div className="flex justify-center gap-4 text-left border-t border-gray-800 pt-6">
                 <div>
+                  <p className="text-xs text-gray-500 mb-1">Wallet Balance</p>
+                  <p className="text-base font-bold text-orange-500 text-center">₹{walletBalance}</p>
+                </div>
+                <div className="w-px bg-gray-800" />
+                <div>
                   <p className="text-xs text-gray-500 mb-1">Active Panels</p>
-                  <p className="text-lg font-bold text-white text-center">{displayProfile.activePanels}</p>
+                  <p className="text-base font-bold text-white text-center">{displayProfile.activePanels}</p>
                 </div>
                 <div className="w-px bg-gray-800" />
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Member Since</p>
-                  <p className="text-sm font-bold text-white mt-1">{displayProfile.joinDate}</p>
+                  <p className="text-xs font-bold text-white mt-1.5">{displayProfile.joinDate.split(',')[0]}</p>
                 </div>
               </div>
             </div>
@@ -183,6 +315,7 @@ export function Profile() {
               <nav className="space-y-1">
                 {[
                   { id: 'personal', icon: <User className="w-5 h-5" />, label: 'Personal Info' },
+                  { id: 'wallet', icon: <Wallet className="w-5 h-5" />, label: 'My Wallet' },
                   { id: 'security', icon: <Shield className="w-5 h-5" />, label: 'Security' },
                   { id: 'preferences', icon: <Settings className="w-5 h-5" />, label: 'Preferences' },
                 ].map((item) => (
@@ -322,6 +455,198 @@ export function Profile() {
                     </div>
                     <p className="mt-1.5 text-xs text-gray-500">Email address cannot be changed. It is linked directly to your secure account login.</p>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'wallet' && (
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                {/* Balance and Add Funds */}
+                <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* Balance Info */}
+                    <div className="flex flex-col justify-between space-y-6 border-b md:border-b-0 md:border-r border-gray-800 pb-6 md:pb-0 md:pr-8">
+                      <div>
+                        <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                          <Wallet className="w-6 h-6 text-orange-500" /> Wallet Balance
+                        </h3>
+                        <p className="text-xs text-gray-500">Use your wallet balance to instantly purchase panels with zero waiting time.</p>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-orange-500/10 to-red-600/10 border border-orange-500/20 rounded-2xl p-6 text-center">
+                        <span className="text-xs text-gray-400 uppercase tracking-widest font-bold block mb-1">Available Funds</span>
+                        <span className="text-4xl md:text-5xl font-black text-white font-mono">₹{walletBalance}</span>
+                      </div>
+
+                      <div className="bg-black/40 border border-gray-800/80 rounded-xl p-4 flex gap-3 text-xs text-gray-400">
+                        <AlertCircle className="w-5 h-5 text-orange-500 shrink-0" />
+                        <div>
+                          <span className="font-bold text-white block mb-0.5">How to Add Funds?</span>
+                          Pay using UPI to our verified address <span className="font-mono text-orange-400">7563075001@ybl</span> (Merchant Name: Manual Payment), then submit the UTR / Transaction ID and screenshot on the right.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Add Funds Form */}
+                    <div>
+                      <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <PlusCircle className="w-5 h-5 text-orange-500" /> Add Funds Request
+                      </h4>
+
+                      {depositMessage && (
+                        <div className={`mb-4 p-4 rounded-xl text-xs font-semibold ${
+                          depositMessage.type === 'success'
+                            ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                            : 'bg-red-500/10 border border-red-500/20 text-red-400'
+                        }`}>
+                          {depositMessage.text}
+                        </div>
+                      )}
+
+                      <form onSubmit={handleDepositSubmit} className="space-y-4 text-xs">
+                        <div>
+                          <label className="block text-gray-400 font-semibold mb-1.5">Amount (₹) *</label>
+                          <input
+                            type="number"
+                            required
+                            min="1"
+                            placeholder="Enter amount to add (e.g. 100)"
+                            value={depositAmount}
+                            onChange={(e) => setDepositAmount(e.target.value)}
+                            className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-gray-400 font-semibold mb-1.5">UTR / Transaction ID *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Enter 12-digit UTR or Transaction ID"
+                            value={depositUtr}
+                            onChange={(e) => setDepositUtr(e.target.value)}
+                            className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-gray-400 font-semibold mb-1.5">Payment Screenshot (Optional)</label>
+                          <label className={`
+                            flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-xl cursor-pointer transition-all
+                            ${depositFile ? 'border-green-500 bg-green-500/5' : 'border-gray-800 hover:border-orange-500 hover:bg-black/50'}
+                          `}>
+                            <div className="flex flex-col items-center justify-center p-2 text-center">
+                              {depositFile ? (
+                                <>
+                                  <span className="text-white font-medium max-w-[200px] truncate">{depositFile.name}</span>
+                                  <span className="text-gray-500 text-[10px] mt-0.5">Click to change</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-6 h-6 text-gray-500 mb-1" />
+                                  <span className="text-gray-400"><span className="font-semibold text-white">Click to upload</span></span>
+                                  <span className="text-[10px] text-gray-500">PNG, JPG, JPEG (MAX. 5MB)</span>
+                                </>
+                              )}
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/png, image/jpeg, image/jpg"
+                              onChange={(e) => setDepositFile(e.target.files?.[0] || null)}
+                            />
+                          </label>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isDepositing || !depositAmount || !depositUtr}
+                          className="w-full py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(249,115,22,0.2)] flex items-center justify-center gap-1.5 text-xs"
+                        >
+                          {isDepositing ? (
+                            <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                          ) : 'Submit Fund Request'}
+                        </button>
+                      </form>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Transaction History */}
+                <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8">
+                  <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-orange-500" /> Transaction History
+                  </h3>
+
+                  {walletLoading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <span className="w-8 h-8 border-2 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+                    </div>
+                  ) : walletTransactions.length > 0 ? (
+                    <div className="space-y-4">
+                      {walletTransactions.map((tx) => {
+                        const isDeposit = tx.product_id === 'wallet_fund_request';
+                        const isApproved = tx.payment_status === 'Verified';
+                        const isRejected = tx.payment_status === 'Rejected';
+                        
+                        return (
+                          <div
+                            key={tx.id}
+                            className="bg-black/50 border border-gray-800/80 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                isDeposit 
+                                  ? 'bg-green-500/10 text-green-400' 
+                                  : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                {isDeposit ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownLeft className="w-5 h-5" />}
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-white text-sm">
+                                  {isDeposit ? 'Added Funds' : `Purchase: ${tx.product_name}`}
+                                </h4>
+                                <div className="flex gap-2 text-[10px] text-gray-500 mt-0.5">
+                                  <span>UTR: {tx.utr_number}</span>
+                                  <span>•</span>
+                                  <span>{tx.payment_date} {tx.payment_time}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className={`font-mono text-sm font-bold block ${
+                                isDeposit ? 'text-green-400' : 'text-red-400'
+                              }`}>
+                                {isDeposit ? '+' : '-'}₹{tx.amount}
+                              </span>
+                              <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 ${
+                                isApproved 
+                                  ? 'bg-green-500/10 text-green-400 border border-green-500/20' 
+                                  : isRejected 
+                                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                  : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                              }`}>
+                                {tx.payment_status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 border border-dashed border-gray-800 rounded-2xl">
+                      <Wallet className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+                      <p className="text-sm text-gray-500">No transactions recorded yet.</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
