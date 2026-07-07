@@ -32,7 +32,7 @@ export function Checkout() {
             .from('orders')
             .select('id')
             .eq('user_id', user.id)
-            .eq('product_id', state.product.id)
+            .eq('product_name', state.product.name)
             .eq('payment_status', 'Pending')
             .limit(1);
             
@@ -134,6 +134,46 @@ export function Checkout() {
         screenshotUrl = publicUrlData.publicUrl;
       }
 
+      // 1. Before creating an order, verify that the selected product or compatible products exist in the products table
+      const { data: dbProducts, error: dbProductsError } = await supabase
+        .from('products')
+        .select('id, name');
+
+      if (dbProductsError || !dbProducts || dbProducts.length === 0) {
+        alert("The product verification system is currently offline or the product was not found in our database. Please select a different product or contact support.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Check if our selected product ID is in the database products
+      let finalProductId = product.id;
+      const exactMatch = dbProducts.find(p => p.id === product.id);
+
+      if (!exactMatch) {
+        // Find a matching/appropriate database product ID based on category/name
+        const pCategory = (product.category || '').toLowerCase();
+        let matchedDbProduct = null;
+
+        if (pCategory.includes('pc')) {
+          matchedDbProduct = dbProducts.find(p => p.id.includes('pc') || p.name.toLowerCase().includes('pc'));
+        } else if (pCategory.includes('root')) {
+          matchedDbProduct = dbProducts.find(p => p.id.includes('root') || p.name.toLowerCase().includes('root'));
+        } else if (pCategory.includes('nonroot') || pCategory.includes('non-root')) {
+          matchedDbProduct = dbProducts.find(p => p.id.includes('non-root') || p.id.includes('nonroot') || p.name.toLowerCase().includes('non-root'));
+        }
+
+        // Fallback to the first available product in the database if no category-specific match is found
+        const resolvedProduct = matchedDbProduct || dbProducts[0];
+        
+        if (!resolvedProduct) {
+          alert("The selected product could not be mapped to any active database catalog items. Please select a different product or contact support.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        finalProductId = resolvedProduct.id;
+      }
+
       // Fetch user profile name
       let customerName = user.user_metadata?.full_name || 'Anonymous User';
       try {
@@ -151,7 +191,7 @@ export function Checkout() {
 
       const { error: insertError } = await supabase.from('orders').insert({
         user_id: user.id,
-        product_id: product.id,
+        product_id: finalProductId,
         product_name: product.name,
         plan_duration: selectedPlan.duration,
         amount: selectedPlan.price,
