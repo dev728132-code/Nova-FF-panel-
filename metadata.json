@@ -1,0 +1,6 @@
+{
+  "name": "Free Fire Panel Store",
+  "description": "Premium Free Fire Panel Store website with modern gaming design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
