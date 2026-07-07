@@ -12,15 +12,23 @@ export function Admin() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
 
-  // Note: For a real app, you would verify if `user.id` is in an admins table or has an admin role.
-  // For demonstration, we allow any logged-in user to see this page.
+  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
+    }
+
+    if (!isOwner) {
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 2000);
+      return () => clearTimeout(timer);
     }
     
     let mounted = true;
@@ -100,6 +108,17 @@ export function Admin() {
 
   const pendingCount = orders.filter(o => o.payment_status === 'Pending').length;
 
+  if (user && !isOwner) {
+    return (
+      <div className="pt-32 pb-20 min-h-screen flex flex-col items-center justify-center bg-black text-center px-4">
+        <XCircle className="w-16 h-16 text-red-500 mb-4 animate-pulse" />
+        <h1 className="text-3xl font-black text-white mb-2 tracking-wide">ACCESS DENIED</h1>
+        <p className="text-gray-400">You do not have administrative privileges to access this panel.</p>
+        <p className="text-gray-500 text-sm mt-2">Redirecting to Home...</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="pt-32 pb-20 min-h-screen flex items-center justify-center">
@@ -111,6 +130,18 @@ export function Admin() {
   return (
     <div className="pt-24 pb-20 min-h-screen bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {isOwner && showOwnerAlert && (
+          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-between text-green-400 text-sm font-semibold shadow-[0_0_15px_rgba(34,197,94,0.15)] animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              <span>Owner login detected. Assigned Admin role.</span>
+            </div>
+            <button onClick={() => setShowOwnerAlert(false)} className="text-green-500 hover:text-green-400 text-xs font-bold font-mono">
+              [DISMISS]
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-8">
           <Shield className="w-8 h-8 text-orange-500" />
           <h1 className="text-3xl font-black text-white">Admin Dashboard</h1>

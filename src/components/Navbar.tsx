@@ -37,13 +37,24 @@ export function Navbar() {
     };
   }, [user]);
 
-  const links = [
+  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
+
+  interface NavLink {
+    name: string;
+    path: string;
+    badge?: number | null;
+  }
+
+  const baseLinks: NavLink[] = [
     { name: 'Home', path: '/' },
     { name: 'Buy Panels', path: '/buy' },
     { name: 'Order History', path: '/history' },
     { name: 'Support', path: '/support' },
-    { name: 'Admin', path: '/admin', badge: pendingCount > 0 ? pendingCount : null },
   ];
+
+  const links: NavLink[] = isOwner
+    ? [...baseLinks, { name: 'Admin', path: '/admin', badge: pendingCount > 0 ? pendingCount : null }]
+    : baseLinks;
 
   const isActive = (path: string) => location.pathname === path;
 
