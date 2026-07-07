@@ -11,13 +11,20 @@ export function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [fundRequests, setFundRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
   const [adminTab, setAdminTab] = useState<'purchases' | 'funds'>('purchases');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
+  
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [productKey, setProductKey] = useState('');
+  const [isApproving, setIsApproving] = useState(false);
 
-  const isOwner = user?.email === 'dev7287132@gmail.com';
+  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
 
   useEffect(() => {
     if (!user) {
@@ -34,16 +41,31 @@ export function Admin() {
     
     let mounted = true;
     const fetchOrders = async () => {
-      const { data, error } = await supabase
+      // 1. Fetch product orders
+      const { data: oData, error: oError } = await supabase
         .from('orders')
         .select('*')
         .order('purchase_date', { ascending: false });
 
-      if (error) {
-        console.error(error);
+      if (oError) {
+        console.error('Error fetching orders:', oError);
       } else if (mounted) {
-        setOrders(data as Order[]);
+        setOrders((oData || []) as Order[]);
       }
+
+      // 2. Fetch fund requests from separate table
+      const { data: frData, error: frError } = await supabase
+        .from('fund_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (frError) {
+        console.warn('fund_requests table might not exist yet:', frError);
+        if (mounted) setFundRequests([]);
+      } else if (mounted) {
+        setFundRequests(frData || []);
+      }
+
       if (mounted) {
         setLoading(false);
       }
@@ -70,40 +92,144 @@ export function Admin() {
       )
       .subscribe();
 
+    // Subscribe to fund_requests as well
+    const frChannel = supabase
+      .channel('admin_fund_requests_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fund_requests'
+        },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
+      supabase.removeChannel(frChannel);
     };
   }, [user?.id, navigate]);
 
-  const updateOrderStatus = async (orderId: string, status: 'Verified' | 'Rejected') => {
-    try {
-      const orderStatus = status === 'Verified' ? 'Completed' : 'Failed';
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          payment_status: status,
-          order_status: orderStatus
-        })
-        .eq('id', orderId);
+  const handleOpenApproveModal = (order: any) => {
+    setSelectedOrder(order);
+    setModalType('approve');
+    setProductKey('');
+    setErrorMessage(null);
+  };
 
-      if (error) throw error;
-      
-      // Update local state
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, payment_status: status, order_status: orderStatus } 
-          : order
-      ));
-      
+  const handleOpenRejectModal = (order: any) => {
+    setSelectedOrder(order);
+    setModalType('reject');
+    setProductKey('');
+    setErrorMessage(null);
+  };
+
+  const handleProcessRequest = async () => {
+    if (!selectedOrder || !modalType || isApproving) return;
+    setIsApproving(true);
+    setErrorMessage(null);
+
+    const isApprove = modalType === 'approve';
+    const noteOrKey = productKey.trim();
+
+    try {
+      if (selectedOrder.is_fund_request_table) {
+        // Update fund_requests table
+        const statusVal = isApprove ? 'Verified' : 'Rejected';
+        const defaultNote = isApprove 
+          ? `Approved by admin on ${new Date().toLocaleDateString()}`
+          : `Rejected by admin on ${new Date().toLocaleDateString()}`;
+
+        const { error } = await supabase
+          .from('fund_requests')
+          .update({
+            status: statusVal,
+            admin_note: noteOrKey || defaultNote
+          })
+          .eq('id', selectedOrder.id);
+
+        if (error) throw error;
+
+        setFundRequests(prev => prev.map(fr =>
+          fr.id === selectedOrder.id ? { ...fr, status: statusVal, admin_note: noteOrKey || defaultNote } : fr
+        ));
+      } else {
+        // Update orders table
+        const pStatus = isApprove ? 'Success' : 'Rejected';
+        const oStatus = isApprove ? 'Approved' : 'Failed';
+
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            payment_status: pStatus,
+            order_status: oStatus,
+            product_key: noteOrKey || (isApprove ? 'Approved' : 'Rejected')
+          })
+          .eq('id', selectedOrder.id);
+
+        if (error) throw error;
+        
+        setOrders(prev => prev.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, payment_status: pStatus, order_status: oStatus, product_key: noteOrKey || (isApprove ? 'Approved' : 'Rejected') } 
+            : order
+        ));
+      }
+
+      // Close modal
+      setSelectedOrder(null);
+      setModalType(null);
+      setProductKey('');
+
+      // Show temporary successful toast
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-5 right-5 bg-green-500 text-white font-bold px-5 py-3 rounded-xl shadow-2xl z-50 animate-fade-in text-sm border border-green-400/30';
+      toast.innerText = isApprove ? 'Order approved and key delivered!' : 'Order rejected successfully!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+
     } catch (e: any) {
-      alert("Error updating order: " + e.message);
+      console.error("Error processing request:", e);
+      setErrorMessage(e.message || "Failed to update database. Please check connection and permissions.");
+    } finally {
+      setIsApproving(false);
     }
   };
 
   const purchasesOrders = orders.filter(o => o.product_id !== 'wallet_fund_request');
-  const fundsOrders = orders.filter(o => o.product_id === 'wallet_fund_request');
+  
+  // If we have separate fund requests records, map them. Otherwise fallback to filtering orders.
+  const fundsOrders = fundRequests.length > 0
+    ? fundRequests.map(fr => {
+        const cDate = new Date(fr.created_at);
+        const paymentDate = cDate.toISOString().split('T')[0];
+        const paymentTime = cDate.toTimeString().split(' ')[0].substring(0, 5);
+        return {
+          id: fr.id,
+          user_id: fr.user_id,
+          product_id: 'wallet_fund_request',
+          product_name: fr.panel_name && fr.plan_name ? `${fr.panel_name} - ${fr.plan_name}` : 'Wallet Fund Request',
+          plan_duration: 'One-time',
+          amount: fr.amount,
+          payment_status: fr.status,
+          order_status: fr.status === 'Verified' ? 'Completed' : fr.status === 'Rejected' ? 'Failed' : 'Pending',
+          purchase_date: fr.created_at,
+          payment_screenshot_url: fr.payment_screenshot || fr.payment_screenshot_url,
+          utr_number: fr.utr_number,
+          payment_date: paymentDate,
+          payment_time: paymentTime,
+          customer_name: fr.username || fr.customer_name || 'Anonymous User',
+          customer_email: fr.email || fr.customer_email || 'No Email',
+          is_fund_request_table: true
+        };
+      })
+    : orders.filter(o => o.product_id === 'wallet_fund_request');
 
   const currentTabOrders = adminTab === 'purchases' ? purchasesOrders : fundsOrders;
 
@@ -285,29 +411,29 @@ export function Admin() {
                       </td>
                       <td className="p-4">
                         <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                          order.payment_status === 'Verified' || order.order_status === 'Completed'
+                          order.payment_status === 'Verified' || order.order_status === 'Completed' || order.payment_status === 'Success' || order.order_status === 'Approved'
                             ? 'bg-green-500/10 text-green-500 border-green-500/20'
                             : order.payment_status === 'Rejected' || order.order_status === 'Failed'
                             ? 'bg-red-500/10 text-red-500 border-red-500/20'
                             : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
                         }`}>
-                          {order.payment_status === 'Verified' || order.order_status === 'Completed' ? <CheckCircle className="w-3 h-3" /> :
+                          {order.payment_status === 'Verified' || order.order_status === 'Completed' || order.payment_status === 'Success' || order.order_status === 'Approved' ? <CheckCircle className="w-3 h-3" /> :
                            order.payment_status === 'Rejected' || order.order_status === 'Failed' ? <XCircle className="w-3 h-3" /> :
                            <Clock className="w-3 h-3" />}
-                          {order.payment_status === 'Pending' ? order.order_status : order.payment_status}
+                          {order.payment_status === 'Pending' ? order.order_status : (order.payment_status === 'Verified' ? 'Success' : order.payment_status)}
                         </div>
                       </td>
                       <td className="p-4 text-right space-x-2">
                         {order.payment_status === 'Pending' && (
                           <>
                             <button
-                              onClick={() => updateOrderStatus(order.id, 'Verified')}
+                              onClick={() => handleOpenApproveModal(order)}
                               className="px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-500 rounded-lg text-sm font-medium transition-colors border border-green-500/20"
                             >
                               Approve
                             </button>
                             <button
-                              onClick={() => updateOrderStatus(order.id, 'Rejected')}
+                              onClick={() => handleOpenRejectModal(order)}
                               className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg text-sm font-medium transition-colors border border-red-500/20"
                             >
                               Reject
@@ -323,6 +449,106 @@ export function Admin() {
           </div>
         </div>
       </div>
+
+      {/* Processing Modal (Approve or Reject) */}
+      {selectedOrder && modalType && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-lg w-full p-6 text-left relative overflow-hidden shadow-2xl animate-fade-in">
+            <h3 className="text-xl font-black text-white mb-6 flex items-center gap-2 border-b border-gray-800 pb-3">
+              {modalType === 'approve' ? (
+                <>
+                  <Shield className="w-5 h-5 text-green-500" /> Deliver Product Key & Approve
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5 text-red-500" /> Provide Rejection Reason & Reject
+                </>
+              )}
+            </h3>
+
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl font-medium">
+                {errorMessage}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-6 text-xs text-gray-300">
+              <div className="grid grid-cols-2 gap-4 bg-black/40 p-3.5 rounded-xl border border-gray-800/60">
+                <div>
+                  <span className="text-gray-500 font-semibold block mb-0.5">Product Name:</span>
+                  <span className="text-white font-bold">{selectedOrder.product_name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 font-semibold block mb-0.5">User Name:</span>
+                  <span className="text-white font-bold">{selectedOrder.customer_name || 'Anonymous User'}</span>
+                </div>
+              </div>
+
+              <div className="bg-black/40 p-3.5 rounded-xl border border-gray-800/60">
+                <span className="text-gray-500 font-semibold block mb-1">Payment Details:</span>
+                <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 font-mono">
+                  <span>Amount: <strong className="text-green-400">₹{selectedOrder.amount}</strong></span>
+                  {selectedOrder.utr_number && <span>UTR: <strong className="text-orange-400">{selectedOrder.utr_number}</strong></span>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 font-bold mb-2">
+                  {modalType === 'approve' 
+                    ? "Product Key / License / Message to Customer *" 
+                    : "Rejection Reason / Message to Customer *"}
+                </label>
+                <textarea
+                  rows={6}
+                  required
+                  placeholder={modalType === 'approve' 
+                    ? "Paste product key, license details, login instructions or any message to the customer..." 
+                    : "Please provide a reason why this payment was rejected (e.g. incorrect UTR, blank screenshot, etc.). This will be shown to the customer."}
+                  value={productKey}
+                  onChange={(e) => setProductKey(e.target.value)}
+                  className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono text-sm leading-relaxed"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setModalType(null);
+                  setProductKey('');
+                  setErrorMessage(null);
+                }}
+                className="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl text-xs transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isApproving}
+                onClick={handleProcessRequest}
+                className={`px-5 py-2.5 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                  modalType === 'approve' 
+                    ? "bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 shadow-[0_0_15px_rgba(249,115,22,0.25)]" 
+                    : "bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.25)]"
+                }`}
+              >
+                {isApproving ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : modalType === 'approve' ? (
+                  'Send & Approve'
+                ) : (
+                  'Send & Reject'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -37,7 +37,150 @@ export function Navbar() {
     };
   }, [user]);
 
-  const isOwner = user?.email === 'dev7287132@gmail.com';
+  useEffect(() => {
+    if (!user) return;
+    
+    let mounted = true;
+
+    const checkStatusTransitions = async () => {
+      try {
+        // Fetch current customer orders
+        const { data: ords } = await supabase
+          .from('orders')
+          .select('id, product_name, order_status, payment_status, product_key')
+          .eq('user_id', user.id);
+
+        // Fetch current customer fund requests
+        const { data: funds } = await supabase
+          .from('fund_requests')
+          .select('id, panel_name, plan_name, status, admin_note')
+          .eq('user_id', user.id);
+
+        if (!mounted) return;
+
+        // Retrieve last known statuses from localStorage
+        const storedStr = localStorage.getItem(`seen_status_${user.id}`);
+        const storedStatuses = storedStr ? JSON.parse(storedStr) : {};
+        const updatedStatuses = { ...storedStatuses };
+
+        let hasNewStatus = false;
+
+        // Process product orders
+        if (ords) {
+          ords.forEach((order) => {
+            const currentStatus = order.order_status;
+            const lastStatus = storedStatuses[order.id];
+
+            if (lastStatus && lastStatus === 'Pending' && currentStatus !== 'Pending') {
+              if (currentStatus === 'Approved' || currentStatus === 'Completed' || currentStatus === 'Success') {
+                showNotificationToast('success', `Your order for "${order.product_name}" has been approved! Product key has been delivered.`);
+              } else if (currentStatus === 'Failed' || currentStatus === 'Rejected') {
+                const rejectReason = order.product_key && order.product_key !== 'Rejected' ? `: "${order.product_key}"` : '';
+                showNotificationToast('error', `Your payment for "${order.product_name}" was rejected${rejectReason}`);
+              }
+            }
+            updatedStatuses[order.id] = currentStatus;
+            if (lastStatus !== currentStatus) {
+              hasNewStatus = true;
+            }
+          });
+        }
+
+        // Process fund requests
+        if (funds) {
+          funds.forEach((fr) => {
+            const currentStatus = fr.status;
+            const lastStatus = storedStatuses[fr.id];
+            const frName = fr.panel_name && fr.plan_name ? `${fr.panel_name} - ${fr.plan_name}` : 'Wallet Fund Request';
+
+            if (lastStatus && lastStatus === 'Pending' && currentStatus !== 'Pending') {
+              if (currentStatus === 'Verified') {
+                showNotificationToast('success', `Your fund request for "${frName}" was approved! Wallet balance updated.`);
+              } else if (currentStatus === 'Rejected') {
+                const rejectReason = fr.admin_note ? `: "${fr.admin_note}"` : '';
+                showNotificationToast('error', `Your fund request for "${frName}" was rejected${rejectReason}`);
+              }
+            }
+            updatedStatuses[fr.id] = currentStatus;
+            if (lastStatus !== currentStatus) {
+              hasNewStatus = true;
+            }
+          });
+        }
+
+        if (hasNewStatus) {
+          localStorage.setItem(`seen_status_${user.id}`, JSON.stringify(updatedStatuses));
+        }
+
+      } catch (err) {
+        console.error('Error tracking status changes:', err);
+      }
+    };
+
+    const showNotificationToast = (type: 'success' | 'error', text: string) => {
+      let container = document.getElementById('global-toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'global-toast-container';
+        container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full px-4 sm:px-0 pointer-events-none';
+        document.body.appendChild(container);
+      }
+
+      const toast = document.createElement('div');
+      toast.className = `p-4 rounded-xl shadow-2xl border text-xs font-semibold animate-fade-in pointer-events-auto flex items-start gap-2.5 transition-all ${
+        type === 'success'
+          ? 'bg-green-500 text-white border-green-400/30 shadow-green-500/10'
+          : 'bg-red-500 text-white border-red-400/30 shadow-red-500/10'
+      }`;
+
+      toast.innerHTML = `
+        <div class="shrink-0 mt-0.5">
+          ${type === 'success' ? '⚡' : '❌'}
+        </div>
+        <div class="flex-grow">
+          <p class="font-bold mb-0.5">${type === 'success' ? 'Approved!' : 'Payment Rejected'}</p>
+          <p class="text-[11px] leading-relaxed opacity-90">${text}</p>
+        </div>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 400);
+      }, 5500);
+    };
+
+    // Initial check
+    checkStatusTransitions();
+
+    // Subscribe to real-time changes
+    const ordersChannel = supabase
+      .channel(`navbar_orders_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` }, () => {
+        checkStatusTransitions();
+      })
+      .subscribe();
+
+    const fundsChannel = supabase
+      .channel(`navbar_funds_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fund_requests', filter: `user_id=eq.${user.id}` }, () => {
+        checkStatusTransitions();
+      })
+      .subscribe();
+
+    // Polling backup
+    const pollId = setInterval(checkStatusTransitions, 5000);
+
+    return () => {
+      mounted = false;
+      clearInterval(pollId);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(fundsChannel);
+    };
+  }, [user?.id]);
+
+  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
 
   interface NavLink {
     name: string;

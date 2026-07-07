@@ -31,30 +31,98 @@ export function Profile() {
   const fetchWalletData = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', user.id)
         .order('purchase_date', { ascending: false });
 
-      if (error) throw error;
+      if (ordersError) throw ordersError;
 
-      if (data) {
-        // Calculate approved deposits
-        const approvedDeposits = data
-          .filter((o: any) => o.product_id === 'wallet_fund_request' && o.payment_status === 'Verified')
-          .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+      // Try fetching from the new fund_requests table
+      const { data: fundRequests, error: fundRequestsError } = await supabase
+        .from('fund_requests')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-        // Calculate wallet purchases
-        const walletPurchases = data
+      if (fundRequestsError) {
+        console.warn('fund_requests table might not exist yet, falling back to orders:', fundRequestsError);
+        
+        if (ordersData) {
+          // Fallback calculation using legacy orders table for fund requests
+          const approvedDeposits = ordersData
+            .filter((o: any) => o.product_id === 'wallet_fund_request' && o.payment_status === 'Verified')
+            .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+          const walletPurchases = ordersData
+            .filter((o: any) => o.utr_number === 'wallet_payment')
+            .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+          setWalletBalance(approvedDeposits - walletPurchases);
+          
+          const walletTx = ordersData.filter((o: any) => o.product_id === 'wallet_fund_request' || o.utr_number === 'wallet_payment');
+          setWalletTransactions(walletTx);
+        }
+      } else {
+        // Use separate tables: fund_requests for deposits, orders for purchases
+        const approvedDeposits = (fundRequests || [])
+          .filter((fr: any) => fr.status === 'Verified')
+          .reduce((sum: number, fr: any) => sum + Number(fr.amount), 0);
+
+        const walletPurchases = (ordersData || [])
           .filter((o: any) => o.utr_number === 'wallet_payment')
           .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
 
         setWalletBalance(approvedDeposits - walletPurchases);
-        
-        // Filter wallet transactions
-        const walletTx = data.filter((o: any) => o.product_id === 'wallet_fund_request' || o.utr_number === 'wallet_payment');
-        setWalletTransactions(walletTx);
+
+        // Map deposits from fund_requests
+        const depositsMapped = (fundRequests || []).map((fr: any) => {
+          const cDate = new Date(fr.created_at);
+          const paymentDate = cDate.toISOString().split('T')[0];
+          const paymentTime = cDate.toTimeString().split(' ')[0].substring(0, 5);
+          return {
+            id: fr.id,
+            product_id: 'wallet_fund_request', // so UI isDeposit stays true
+            product_name: fr.panel_name && fr.plan_name ? `${fr.panel_name} - ${fr.plan_name}` : 'Wallet Fund Request',
+            plan_duration: 'One-time',
+            amount: fr.amount,
+            payment_status: fr.status,
+            utr_number: fr.utr_number,
+            payment_screenshot_url: fr.payment_screenshot || fr.payment_screenshot_url,
+            payment_date: paymentDate,
+            payment_time: paymentTime,
+            purchase_date: fr.created_at,
+            created_at: fr.created_at,
+            is_deposit: true
+          };
+        });
+
+        // Map purchases from orders
+        const purchasesMapped = (ordersData || [])
+          .filter((o: any) => o.utr_number === 'wallet_payment')
+          .map((o: any) => ({
+            id: o.id,
+            product_id: o.product_id,
+            product_name: o.product_name,
+            plan_duration: o.plan_duration,
+            amount: o.amount,
+            payment_status: o.payment_status,
+            utr_number: o.utr_number,
+            payment_screenshot_url: o.payment_screenshot_url,
+            payment_date: o.payment_date,
+            payment_time: o.payment_time,
+            purchase_date: o.purchase_date,
+            created_at: o.purchase_date,
+            is_deposit: false
+          }));
+
+        // Merge and sort by date descending
+        const allTxs = [...depositsMapped, ...purchasesMapped].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+
+        setWalletTransactions(allTxs);
       }
     } catch (err) {
       console.error('Error fetching wallet data:', err);
@@ -101,31 +169,26 @@ export function Profile() {
         screenshotUrl = publicUrlData.publicUrl;
       }
       
-      const paymentDate = new Date().toISOString().split('T')[0];
-      const paymentTime = new Date().toTimeString().split(' ')[0].substring(0, 5);
-
-      const { error: insertError } = await supabase.from('orders').insert({
+      // Insert directly into the separate fund_requests table
+      const { error: insertError } = await supabase.from('fund_requests').insert({
         user_id: user.id,
-        product_id: 'wallet_fund_request',
-        product_name: 'Wallet Fund Request',
-        plan_duration: 'One-time',
+        username: profile?.full_name || 'Anonymous User',
+        email: user.email,
+        panel_name: 'Wallet',
+        plan_name: 'Top-up',
         amount: amountNum,
-        payment_status: 'Pending',
-        order_status: 'Pending',
-        expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        payment_screenshot_url: screenshotUrl || null,
         utr_number: depositUtr.trim(),
-        payment_date: paymentDate,
-        payment_time: paymentTime,
-        customer_name: profile?.full_name || 'Anonymous User',
-        customer_email: user.email
+        payment_screenshot: screenshotUrl || null,
+        status: 'Pending'
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        throw insertError;
+      }
 
       setDepositMessage({
         type: 'success',
-        text: 'Fund request submitted successfully. Please wait while the admin verifies your payment.'
+        text: 'Payment request submitted successfully. Please wait while the admin verifies your payment.'
       });
       setDepositAmount('');
       setDepositUtr('');

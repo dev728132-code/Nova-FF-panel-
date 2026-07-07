@@ -25,7 +25,7 @@ export function Auth() {
 
   useEffect(() => {
     if (user) {
-      const isOwner = user.email === 'dev7287132@gmail.com';
+      const isOwner = user.email === 'dev7287132@gmail.com' || user.email === 'dev728132@gmail.com';
       if (isOwner) {
         setSuccessMessage('Owner login detected.');
         const timer = setTimeout(() => {
@@ -52,7 +52,8 @@ export function Auth() {
         if (error) throw error;
         setSuccessMessage('Password reset link sent! Please check your email inbox.');
       } else if (isLogin) {
-        if (email === 'dev7287132@gmail.com' && password === '929w9nm') {
+        const isTargetAdmin = email === 'dev7287132@gmail.com' || email === 'dev728132@gmail.com';
+        if (isTargetAdmin && password === '929w9nm') {
           // If trying to sign in as the designated admin with correct password
           try {
             const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -91,7 +92,7 @@ export function Auth() {
           if (error) throw error;
         }
       } else {
-        if (email === 'dev7287132@gmail.com') {
+        if (email === 'dev7287132@gmail.com' || email === 'dev728132@gmail.com') {
           throw new Error('This email is reserved for Admin.');
         }
 

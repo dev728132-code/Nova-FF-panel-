@@ -32,19 +32,39 @@ export function Checkout() {
     
     const fetchWalletBalance = async () => {
       try {
-        const { data, error } = await supabase
+        const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select('*')
           .eq('user_id', user.id);
 
-        if (error) throw error;
+        if (ordersError) throw ordersError;
 
-        if (data) {
-          const approvedDeposits = data
-            .filter((o: any) => o.product_id === 'wallet_fund_request' && o.payment_status === 'Verified')
-            .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+        // Try querying the separate fund_requests table
+        const { data: fundRequests, error: fundRequestsError } = await supabase
+          .from('fund_requests')
+          .select('*')
+          .eq('user_id', user.id);
 
-          const walletPurchases = data
+        if (fundRequestsError) {
+          console.warn('fund_requests table might not exist yet, falling back to orders:', fundRequestsError);
+          if (ordersData) {
+            const approvedDeposits = ordersData
+              .filter((o: any) => o.product_id === 'wallet_fund_request' && o.payment_status === 'Verified')
+              .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+            const walletPurchases = ordersData
+              .filter((o: any) => o.utr_number === 'wallet_payment')
+              .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
+
+            setWalletBalance(approvedDeposits - walletPurchases);
+          }
+        } else {
+          // Both tables exist
+          const approvedDeposits = (fundRequests || [])
+            .filter((fr: any) => fr.status === 'Verified')
+            .reduce((sum: number, fr: any) => sum + Number(fr.amount), 0);
+
+          const walletPurchases = (ordersData || [])
             .filter((o: any) => o.utr_number === 'wallet_payment')
             .reduce((sum: number, o: any) => sum + Number(o.amount), 0);
 

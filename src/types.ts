@@ -14,8 +14,8 @@ export type Product = {
   plans: Plan[];
 };
 
-export type OrderStatus = 'Pending' | 'Completed' | 'Failed';
-export type PaymentStatus = 'Pending' | 'Verified' | 'Rejected';
+export type OrderStatus = 'Pending' | 'Completed' | 'Failed' | 'Approved' | 'Success';
+export type PaymentStatus = 'Pending' | 'Verified' | 'Rejected' | 'Success' | 'Approved';
 
 export type Order = {
   id: string;
@@ -34,4 +34,5 @@ export type Order = {
   payment_screenshot_url?: string;
   customer_name?: string;
   customer_email?: string;
+  product_key?: string;
 };
