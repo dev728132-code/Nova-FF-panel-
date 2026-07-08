@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { CheckCircle, Upload, ShieldCheck, ArrowLeft, QrCode, AlertCircle, Wallet } from 'lucide-react';
+import { CheckCircle, Upload, ShieldCheck, ArrowLeft, QrCode, AlertCircle, Wallet, Crown, Zap, RefreshCw, Star } from 'lucide-react';
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -303,9 +303,11 @@ export function EliteGrowthCheckout() {
     );
   }
 
+  const isVip = product.name === 'SAN GROW VIP METHODS';
+
   return (
     <div className="pt-24 pb-20 min-h-screen bg-black">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <button 
           onClick={() => navigate(-1)}
@@ -316,10 +318,73 @@ export function EliteGrowthCheckout() {
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           
-          <div className="lg:col-span-3 space-y-6">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 md:p-8">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                <QrCode className="w-6 h-6 text-orange-500" /> Payment Details
+          {isVip && (
+            <div className="lg:col-span-3 space-y-6">
+              <div className="bg-gradient-to-b from-yellow-500/10 to-gray-900 border border-yellow-500/30 rounded-3xl overflow-hidden relative shadow-[0_0_40px_rgba(234,179,8,0.1)]">
+                {/* BEST SELLER Ribbon */}
+                <div className="absolute top-6 -left-8 -rotate-45 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-black text-xs px-10 py-1 shadow-lg z-20">
+                  BEST SELLER
+                </div>
+                
+                <div className="relative h-64 md:h-80 overflow-hidden bg-black">
+                  <img src={product.image_url || 'https://images.unsplash.com/photo-1614064641913-6b71f3016345?w=800&q=80'} className="w-full h-full object-cover" alt={product.name} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent" />
+                  <div className="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
+                    <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-black text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+                      <Crown className="w-3 h-3" /> VIP
+                    </span>
+                    <span className="bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
+                      <Zap className="w-3 h-3" /> 90% OFF
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="p-8">
+                  <div className="inline-block border border-yellow-500/50 text-yellow-500 text-xs font-bold px-3 py-1 rounded-full w-fit mb-4 uppercase tracking-wider">
+                    Lifetime Access
+                  </div>
+                  
+                  <h3 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">{product.name}</h3>
+                  <p className="text-gray-300 text-lg mb-6 leading-relaxed">{product.description}</p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-6 mb-8">
+                    <div className="flex flex-col items-center sm:items-start w-full sm:w-auto bg-black/50 p-4 rounded-2xl border border-yellow-500/20">
+                      <span className="text-gray-500 line-through text-lg font-medium mb-1">₹7,000</span>
+                      <span className="text-red-500 font-bold text-sm mb-1">🔴 90% OFF</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-gray-300">Only</span>
+                        <span className="text-yellow-500 font-black text-4xl">₹{product.price}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {product.features && product.features.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                      {product.features.map((f: string, i: number) => (
+                        <div key={i} className="flex items-start gap-3 bg-black/50 p-4 rounded-2xl border border-gray-800 hover:border-yellow-500/30 transition-colors">
+                          <CheckCircle className="w-5 h-5 text-yellow-500 shrink-0" />
+                          <span className="text-gray-300 font-medium text-sm">{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 rounded-2xl p-6 flex gap-4 items-center">
+                    <RefreshCw className="w-8 h-8 text-yellow-500 shrink-0" />
+                    <div>
+                      <h4 className="text-white font-bold text-lg mb-1">Regular Updates Included</h4>
+                      <p className="text-gray-400 text-sm">Get lifetime access to all future methods and resources automatically. No extra fees.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={isVip ? "lg:col-span-2 space-y-6" : "lg:col-span-3 space-y-6"}>
+            <div className={`rounded-2xl p-6 md:p-8 ${isVip ? 'bg-gray-900 border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.1)]' : 'bg-gray-900 border border-gray-800'}`}>
+              <h2 className={`text-2xl font-bold mb-6 flex items-center gap-3 ${isVip ? 'text-yellow-500' : 'text-white'}`}>
+                <QrCode className="w-6 h-6" /> Payment Details
               </h2>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
@@ -518,43 +583,45 @@ export function EliteGrowthCheckout() {
             </div>
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 sticky top-24">
-              <h3 className="text-xl font-bold text-white mb-6">Order Summary</h3>
-              
-              <div className="flex gap-4 mb-6 pb-6 border-b border-gray-800">
-                <img src={product.image_url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80'} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
-                <div>
-                  <h4 className="font-bold text-white mb-1 leading-tight">{product.name}</h4>
-                  <p className="text-xs text-orange-500 font-medium">Elite Growth Resource</p>
+          {!isVip && (
+            <div className="lg:col-span-2">
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 sticky top-24">
+                <h3 className="text-xl font-bold text-white mb-6">Order Summary</h3>
+                
+                <div className="flex gap-4 mb-6 pb-6 border-b border-gray-800">
+                  <img src={product.image_url || 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80'} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
+                  <div>
+                    <h4 className="font-bold text-white mb-1 leading-tight">{product.name}</h4>
+                    <p className="text-xs text-orange-500 font-medium">Elite Growth Resource</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-4 mb-6 pb-6 border-b border-gray-800">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white font-medium">₹{product.price}</span>
+                <div className="space-y-4 mb-6 pb-6 border-b border-gray-800">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Subtotal</span>
+                    <span className="text-white font-medium">₹{product.price}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Processing Fee</span>
+                    <span className="text-green-500 font-medium">Free</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Processing Fee</span>
-                  <span className="text-green-500 font-medium">Free</span>
+
+                <div className="flex justify-between items-end mb-8">
+                  <span className="text-gray-300 font-medium">Total Amount</span>
+                  <span className="text-3xl font-black text-white">₹{product.price}</span>
                 </div>
-              </div>
 
-              <div className="flex justify-between items-end mb-8">
-                <span className="text-gray-300 font-medium">Total Amount</span>
-                <span className="text-3xl font-black text-white">₹{product.price}</span>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-xl p-4 flex gap-3">
-                <ShieldCheck className="w-6 h-6 text-green-500 shrink-0" />
-                <div>
-                  <h5 className="text-sm font-bold text-white mb-1">Secure Transaction</h5>
-                  <p className="text-xs text-gray-500">Your payments are verified manually by our team to ensure safety.</p>
+                <div className="bg-black border border-gray-800 rounded-xl p-4 flex gap-3">
+                  <ShieldCheck className="w-6 h-6 text-green-500 shrink-0" />
+                  <div>
+                    <h5 className="text-sm font-bold text-white mb-1">Secure Transaction</h5>
+                    <p className="text-xs text-gray-500">Your payments are verified manually by our team to ensure safety.</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>
