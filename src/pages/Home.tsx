@@ -75,7 +75,7 @@ export function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
                 icon: <ShieldCheck className="w-8 h-8 text-orange-500" />,
@@ -91,6 +91,11 @@ export function Home() {
                 icon: <Users className="w-8 h-8 text-orange-500" />,
                 title: 'Premium Quality Mods',
                 desc: 'We should use good things. Every single panel is carefully crafted, refined, and regularly updated with top-tier premium features.'
+              },
+              {
+                icon: <Star className="w-8 h-8 text-orange-500" />,
+                title: 'Elite Growth',
+                desc: 'All secret YouTube growth tricks, premium resources, exclusive strategies, updated guides, and digital products to help creators grow their channels faster.'
               }
             ].map((feature, idx) => (
               <motion.div

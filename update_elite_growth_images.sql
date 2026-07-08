@@ -1,0 +1,25 @@
+UPDATE public.elite_growth_products
+SET image_url = CASE name
+    WHEN '1000+ Free Reel Bundle' THEN 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=800&q=80'
+    WHEN 'Content Owner Channel' THEN 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?w=800&q=80'
+    WHEN 'YouTube Watchtime Mastery' THEN 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80'
+    WHEN 'USA Movie Uploading' THEN 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80'
+    WHEN 'Copy Paste Master' THEN 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80'
+    WHEN 'Doremon & Shinchan Uploading' THEN 'https://images.unsplash.com/photo-1541562232579-512a21360020?w=800&q=80'
+    WHEN 'Lofi Song Uploading' THEN 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800&q=80'
+    WHEN 'Movie Explanation' THEN 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80'
+    WHEN 'AI Automation' THEN 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80'
+    WHEN 'Animation Like NYT & Cricket Video' THEN 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&q=80'
+    WHEN 'KK Create All' THEN 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80'
+    WHEN 'Other YouTube Resources' THEN 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80'
+    WHEN 'Netflix Movie Uploading' THEN 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800&q=80'
+    WHEN '4000+ Watch Time' THEN 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80'
+    WHEN 'YouTube Copyright' THEN 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&q=80'
+    WHEN 'USA Copy Paste & Movie Uploading' THEN 'https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=800&q=80'
+    WHEN 'Bigg Boss Uploading' THEN 'https://images.unsplash.com/photo-1516280440502-62a2653288ec?w=800&q=80'
+    WHEN 'TV Serial Uploading' THEN 'https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&q=80'
+    WHEN 'CID Uploading' THEN 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80'
+    WHEN 'Facebook Resources' THEN 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=800&q=80'
+    WHEN 'YouTube Creators' THEN 'https://images.unsplash.com/photo-1593640408182-31c70c8268f5?w=800&q=80'
+    ELSE image_url
+END;

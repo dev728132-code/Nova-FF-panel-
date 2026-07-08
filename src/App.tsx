@@ -9,6 +9,8 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
 import { BuyPanels } from './pages/BuyPanels';
+import { EliteGrowth } from './pages/EliteGrowth';
+import { EliteGrowthCheckout } from './pages/EliteGrowthCheckout';
 import { Checkout } from './pages/Checkout';
 import { OrderHistory } from './pages/OrderHistory';
 import { Profile } from './pages/Profile';
@@ -47,6 +49,8 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/buy" element={<BuyPanels />} />
+          <Route path="/elite-growth" element={<EliteGrowth />} />
+          <Route path="/elite-growth/checkout" element={<EliteGrowthCheckout />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/history" element={<OrderHistory />} />
           <Route path="/profile" element={<Profile />} />

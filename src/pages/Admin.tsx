@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { useScrollTop } from '../hooks';
-import { Shield, CheckCircle, XCircle, Clock, Wallet } from 'lucide-react';
+import { AdminEliteProducts } from '../components/AdminEliteProducts';
+import { Shield, CheckCircle, XCircle, Clock, Wallet, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function Admin() {
@@ -15,7 +16,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
-  const [adminTab, setAdminTab] = useState<'purchases' | 'funds'>('purchases');
+  const [adminTab, setAdminTab] = useState<'purchases' | 'funds' | 'elite_products'>('purchases');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
   
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -325,9 +326,25 @@ export function Admin() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => {
+              setAdminTab('elite_products');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+              adminTab === 'elite_products'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Star className="w-4 h-4" /> Elite Products
+          </button>
         </div>
 
-        <div className="flex items-center gap-2 mb-6">
+        {adminTab === 'elite_products' ? (
+          <AdminEliteProducts />
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-6">
           {['Pending', 'Verified', 'Rejected', 'All'].map(f => (
             <button
               key={f}
@@ -448,6 +465,8 @@ export function Admin() {
             </table>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Processing Modal (Approve or Reject) */}

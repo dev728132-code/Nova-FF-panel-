@@ -29,11 +29,31 @@ export function OrderHistory() {
           .select('*')
           .eq('user_id', user.id)
           .order('purchase_date', { ascending: false });
+
+        const { data: eliteData, error: eliteError } = await supabase
+          .from('elite_growth_orders')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
         
         if (error) throw error;
         
-        if (mounted && data) {
-          setOrders(data.filter((o: any) => o.product_id !== 'wallet_fund_request'));
+        if (mounted) {
+          let merged: any[] = [];
+          if (data) {
+            merged = [...merged, ...data.filter((o: any) => o.product_id !== 'wallet_fund_request')];
+          }
+          if (eliteData) {
+            const eliteFormatted = eliteData.map((eo: any) => ({
+              ...eo,
+              purchase_date: eo.created_at,
+              expiry_date: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString(), // Lifetime
+              plan_duration: 'Lifetime'
+            }));
+            merged = [...merged, ...eliteFormatted];
+          }
+          merged.sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime());
+          setOrders(merged);
         }
       } catch (err) {
         console.error('Error fetching orders:', err);
@@ -50,7 +70,7 @@ export function OrderHistory() {
     const pollInterval = setInterval(fetchOrders, 4000);
 
     // 2. Real-time Supabase subscription for truly instant updates
-    const channel = supabase
+    const channel1 = supabase
       .channel(`orders_user_${user.id}`)
       .on(
         'postgres_changes',
@@ -61,7 +81,22 @@ export function OrderHistory() {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Realtime change detected:', payload);
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    const channel2 = supabase
+      .channel(`elite_orders_user_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'elite_growth_orders',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
           fetchOrders();
         }
       )
@@ -70,7 +105,8 @@ export function OrderHistory() {
     return () => {
       mounted = false;
       clearInterval(pollInterval);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
     };
   }, [user?.id, authLoading]);
 

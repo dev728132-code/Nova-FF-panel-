@@ -191,6 +191,7 @@ export function Navbar() {
   const baseLinks: NavLink[] = [
     { name: 'Home', path: '/' },
     { name: 'Buy Panels', path: '/buy' },
+    { name: 'Elite Growth', path: '/elite-growth' },
     { name: 'Order History', path: '/history' },
     { name: 'Support', path: '/support' },
   ];
