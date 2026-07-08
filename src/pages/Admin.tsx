@@ -48,10 +48,35 @@ export function Admin() {
         .select('*')
         .order('purchase_date', { ascending: false });
 
+      // Fetch elite growth orders
+      const { data: egData, error: egError } = await supabase
+        .from('elite_growth_orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
       if (oError) {
         console.error('Error fetching orders:', oError);
-      } else if (mounted) {
-        setOrders((oData || []) as Order[]);
+      }
+      if (egError) {
+        console.error('Error fetching elite growth orders:', egError);
+      }
+
+      if (mounted) {
+        let mergedOrders: any[] = [];
+        if (oData) {
+          mergedOrders = [...mergedOrders, ...oData];
+        }
+        if (egData) {
+          const egFormatted = egData.map((eo: any) => ({
+            ...eo,
+            purchase_date: eo.created_at,
+            plan_duration: 'Lifetime',
+            is_elite_growth_table: true
+          }));
+          mergedOrders = [...mergedOrders, ...egFormatted];
+        }
+        mergedOrders.sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime());
+        setOrders(mergedOrders as Order[]);
       }
 
       // 2. Fetch fund requests from separate table
@@ -109,11 +134,28 @@ export function Admin() {
       )
       .subscribe();
 
+    // Subscribe to elite_growth_orders
+    const egChannel = supabase
+      .channel('admin_elite_growth_orders_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'elite_growth_orders'
+        },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
       supabase.removeChannel(frChannel);
+      supabase.removeChannel(egChannel);
     };
   }, [user?.id, navigate]);
 
@@ -159,6 +201,27 @@ export function Admin() {
 
         setFundRequests(prev => prev.map(fr =>
           fr.id === selectedOrder.id ? { ...fr, status: statusVal, admin_note: noteOrKey || defaultNote } : fr
+        ));
+      } else if (selectedOrder.is_elite_growth_table) {
+        // Update elite_growth_orders table
+        const pStatus = isApprove ? 'Verified' : 'Rejected';
+        const oStatus = isApprove ? 'Completed' : 'Failed';
+
+        const { error } = await supabase
+          .from('elite_growth_orders')
+          .update({
+            payment_status: pStatus,
+            order_status: oStatus,
+            product_key: noteOrKey || (isApprove ? 'Approved' : 'Rejected')
+          })
+          .eq('id', selectedOrder.id);
+
+        if (error) throw error;
+        
+        setOrders(prev => prev.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, payment_status: pStatus, order_status: oStatus, product_key: noteOrKey || (isApprove ? 'Approved' : 'Rejected') } 
+            : order
         ));
       } else {
         // Update orders table

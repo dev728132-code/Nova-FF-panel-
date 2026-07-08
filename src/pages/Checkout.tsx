@@ -6,6 +6,7 @@ import { Product, Plan } from '../types';
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 export function Checkout() {
   useScrollTop();
@@ -283,6 +284,10 @@ export function Checkout() {
       });
 
       if (insertError) throw insertError;
+
+      if (!isWalletPayment) {
+        toast.success('Payment request submitted. Admin has been notified!');
+      }
 
       setIsSuccess(true);
     } catch (err: any) {

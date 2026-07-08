@@ -5,6 +5,7 @@ import { CheckCircle, Upload, ShieldCheck, ArrowLeft, QrCode, AlertCircle, Walle
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 export function EliteGrowthCheckout() {
   useScrollTop();
@@ -251,6 +252,10 @@ export function EliteGrowthCheckout() {
       });
 
       if (insertError) throw insertError;
+
+      if (!isWalletPayment) {
+        toast.success('Payment request submitted. Admin has been notified!');
+      }
 
       setIsSuccess(true);
     } catch (err: any) {

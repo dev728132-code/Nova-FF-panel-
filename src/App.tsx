@@ -4,6 +4,7 @@
  */
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -67,6 +68,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster position="top-center" toastOptions={{ style: { background: '#111827', color: '#fff', border: '1px solid #1f2937' } }} />
         <AppContent />
       </Router>
     </AuthProvider>

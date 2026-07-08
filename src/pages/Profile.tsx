@@ -5,6 +5,7 @@ import { User, Mail, Shield, Settings, LogOut, Smartphone, Key, Wallet, PlusCirc
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 export function Profile() {
   useScrollTop();
@@ -185,6 +186,8 @@ export function Profile() {
       if (insertError) {
         throw insertError;
       }
+
+      toast.success('Payment request submitted. Admin has been notified!');
 
       setDepositMessage({
         type: 'success',
