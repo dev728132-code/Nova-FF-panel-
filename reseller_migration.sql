@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.login_history (
 CREATE TABLE IF NOT EXISTS public.reseller_prices (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     reseller_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
-    plan_id text REFERENCES public.plans(id) ON DELETE CASCADE,
+    plan_id text NOT NULL,
     price numeric NOT NULL,
     UNIQUE(reseller_id, plan_id)
 );

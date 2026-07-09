@@ -54,18 +54,21 @@ export function BuyPanels() {
           const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
           if (profile?.role === 'reseller') {
             const { data: rPrices } = await supabase.from('reseller_prices').select('*').eq('reseller_id', user.id);
+            const priceMap = new Map();
             if (rPrices && rPrices.length > 0) {
-              const priceMap = new Map();
               rPrices.forEach(rp => priceMap.set(rp.plan_id, rp.price));
-              
-              merged = merged.map(prod => ({
-                ...prod,
-                plans: prod.plans.map(plan => ({
-                  ...plan,
-                  price: priceMap.has(plan.id) ? priceMap.get(plan.id) : plan.price
-                }))
-              }));
             }
+            
+            merged = merged.map(prod => ({
+              ...prod,
+              plans: prod.plans.map(plan => {
+                const defaultResellerPrice = Math.floor(plan.price * 0.5);
+                return {
+                  ...plan,
+                  price: priceMap.has(plan.id) ? priceMap.get(plan.id) : defaultResellerPrice
+                };
+              })
+            }));
           }
         }
         

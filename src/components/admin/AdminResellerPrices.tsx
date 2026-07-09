@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Profile, Product, Plan, ResellerPrice } from '../../types';
 import { ArrowLeft, Save } from 'lucide-react';
+import { NEW_PRODUCTS } from '../../data/products';
 
 interface Props {
   reseller: Profile;
@@ -22,11 +23,36 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
     setLoading(true);
     
     // Fetch all products and plans
-    const { data: prodData } = await supabase
-      .from('products')
-      .select('*, plans(*)');
+    let merged = [...NEW_PRODUCTS];
+    try {
+      const { data: dbProducts } = await supabase.from('products').select('*');
       
-    if (prodData) setProducts(prodData as any);
+      if (dbProducts && dbProducts.length > 0) {
+        const { data: dbPlans } = await supabase.from('plans').select('*');
+        
+        dbProducts.forEach(dbProduct => {
+          const index = merged.findIndex(p => p.id === dbProduct.id);
+          const productPlans = dbPlans ? dbPlans.filter((p: any) => p.product_id === dbProduct.id) : [];
+          
+          if (index !== -1) {
+            const localProduct = merged[index];
+            merged[index] = {
+              ...localProduct,
+              ...dbProduct,
+              plans: productPlans.length > 0 ? productPlans : localProduct.plans
+            };
+          } else {
+            merged.push({
+              ...dbProduct,
+              plans: productPlans
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("Error fetching products from DB", err);
+    }
+    setProducts(merged);
 
     // Fetch reseller prices
     const { data: priceData } = await supabase
@@ -122,7 +148,7 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
                           type="number"
                           value={prices[plan.id] || ''}
                           onChange={(e) => handlePriceChange(plan.id, e.target.value)}
-                          placeholder={plan.price.toString()}
+                          placeholder={(Math.floor(plan.price * 0.5)).toString()}
                           className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-orange-500 font-mono font-bold"
                         />
                       </div>
