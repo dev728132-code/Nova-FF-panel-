@@ -341,6 +341,15 @@ export function Checkout() {
       });
 
       if (insertError) throw insertError;
+
+        if (appliedPromo) {
+          try {
+            const { data: currentPromo } = await supabase.from("promo_codes").select("times_used").eq("id", appliedPromo.id).single();
+            if (currentPromo) {
+              await supabase.from("promo_codes").update({ times_used: (currentPromo.times_used || 0) + 1 }).eq("id", appliedPromo.id);
+            }
+          } catch(e) {}
+        }
       
       // Update promo code usage count
       if (appliedPromo) {
@@ -677,7 +686,7 @@ export function Checkout() {
               <div className="space-y-4 mb-6 pb-6 border-b border-gray-800">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white font-medium">₹{finalDisplayAmount}</span>
+                  <span className="text-white font-medium">₹{selectedPlan.price}</span>
                 </div>
                 {appliedPromo && (
                   <div className="flex justify-between text-sm">

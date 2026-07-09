@@ -26,6 +26,45 @@ export function EliteGrowthCheckout() {
   const state = location.state as { product: any } | null;
 
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount_percentage?: number; fixed_discount?: number; id: string } | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setPromoError("");
+    setAppliedPromo(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from("promo_codes")
+        .select("*")
+        .eq("code", promoCode.toUpperCase().trim())
+        .single();
+        
+      if (error || !data) {
+        throw new Error("Invalid promo code");
+      }
+      if (!data.is_active) {
+        throw new Error("This promo code is no longer active");
+      }
+      if (data.expiry_date && new Date(data.expiry_date) < new Date()) {
+        throw new Error("This promo code has expired");
+      }
+      if (data.usage_limit && data.times_used >= data.usage_limit) {
+        throw new Error("This promo code has reached its usage limit");
+      }
+      setAppliedPromo(data);
+      toast.success("Promo code applied successfully!");
+    } catch (err: any) {
+      setPromoError(err.message);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!user) return;
@@ -156,7 +195,8 @@ export function EliteGrowthCheckout() {
   const { product } = state;
   const upiId = "7563075001@ybl";
   const merchantName = "FF Store";
-  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${product.price}&cu=INR`;
+  const finalDisplayAmount = Math.max(0, product.price - (appliedPromo ? (appliedPromo.discount_percentage ? (product.price * appliedPromo.discount_percentage / 100) : (appliedPromo.fixed_discount || 0)) : 0));
+  const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(merchantName)}&am=${finalDisplayAmount}&cu=INR`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
 
   const handleConfirm = async () => {
@@ -169,7 +209,7 @@ export function EliteGrowthCheckout() {
     const isWalletPayment = paymentMethod === 'wallet';
 
     if (isWalletPayment) {
-      if (walletBalance < product.price) {
+      if (walletBalance < finalDisplayAmount) {
         alert("Insufficient Wallet Balance. Please add funds.");
         return;
       }
@@ -227,7 +267,7 @@ export function EliteGrowthCheckout() {
           product_id: 'elite_growth_purchase',
           product_name: `Elite Growth - ${product.name}`,
           plan_duration: 'Lifetime',
-          amount: product.price,
+          amount: finalDisplayAmount,
           payment_status: 'Verified',
           order_status: 'Completed',
           expiry_date: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString(),
@@ -244,7 +284,7 @@ export function EliteGrowthCheckout() {
         user_id: user.id,
         product_id: product.id,
         product_name: product.name,
-        amount: product.price,
+        amount: finalDisplayAmount,
         payment_status: isWalletPayment ? 'Verified' : 'Pending',
         order_status: isWalletPayment ? 'Completed' : 'Pending',
         screenshot_url: screenshotUrl,
@@ -252,6 +292,15 @@ export function EliteGrowthCheckout() {
       });
 
       if (insertError) throw insertError;
+
+      if (appliedPromo) {
+        try {
+          const { data: currentPromo } = await supabase.from("promo_codes").select("times_used").eq("id", appliedPromo.id).single();
+          if (currentPromo) {
+            await supabase.from("promo_codes").update({ times_used: (currentPromo.times_used || 0) + 1 }).eq("id", appliedPromo.id);
+          }
+        } catch(e) {}
+      }
       
       try {
         await supabase.from('admin_notifications').insert({
@@ -360,7 +409,7 @@ export function EliteGrowthCheckout() {
                       <span className="text-red-500 font-bold text-sm mb-1">🔴 90% OFF</span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-gray-300">Only</span>
-                        <span className="text-yellow-500 font-black text-4xl">₹{product.price}</span>
+                        <span className="text-yellow-500 font-black text-4xl">₹{finalDisplayAmount}</span>
                       </div>
                     </div>
                   </div>
@@ -425,7 +474,7 @@ export function EliteGrowthCheckout() {
                     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-red-500/5" />
                     <div className="mb-4 relative z-10 space-y-1">
                       <p className="text-sm text-gray-400">Product: <span className="text-white font-bold">{product.name}</span></p>
-                      <p className="text-sm text-gray-400">Amount: <span className="text-orange-500 font-bold">₹{product.price}</span></p>
+                      <p className="text-sm text-gray-400">Amount: <span className="text-orange-500 font-bold">₹{finalDisplayAmount}</span></p>
                     </div>
                     <div className="w-full border-t border-gray-800/50 my-3 relative z-10" />
                     <p className="text-sm text-gray-400 mb-2 relative z-10">Scan QR or Copy UPI ID</p>
@@ -440,7 +489,7 @@ export function EliteGrowthCheckout() {
                         referrerPolicy="no-referrer"
                       />
                     </div>
-                    <p className="text-xs text-gray-500 relative z-10">Please pay exactly ₹{product.price}</p>
+                    <p className="text-xs text-gray-500 relative z-10">Please pay exactly ₹{finalDisplayAmount}</p>
                   </div>
 
                   <div className="space-y-4 mb-8 text-left">
@@ -526,25 +575,25 @@ export function EliteGrowthCheckout() {
                       </div>
                       <div className="flex justify-between items-center pb-3 border-b border-gray-800/60">
                         <span className="text-gray-400">Product Price</span>
-                        <span className="text-orange-500 font-black font-mono">- ₹{product.price}</span>
+                        <span className="text-orange-500 font-black font-mono">- ₹{finalDisplayAmount}</span>
                       </div>
                       <div className="flex justify-between items-center pt-1">
                         <span className="text-gray-300 font-bold">Remaining Balance</span>
                         <span className={`font-black font-mono text-lg ${
-                          walletBalance >= product.price ? 'text-green-400' : 'text-red-400'
+                          walletBalance >= finalDisplayAmount ? 'text-green-400' : 'text-red-400'
                         }`}>
-                          ₹{walletBalance - product.price}
+                          ₹{walletBalance - finalDisplayAmount}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {walletBalance < product.price ? (
+                  {walletBalance < finalDisplayAmount ? (
                     <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 flex gap-3 text-xs">
                       <AlertCircle className="w-5 h-5 shrink-0 animate-pulse" />
                       <div>
                         <span className="font-bold block mb-1">Insufficient Wallet Balance</span>
-                        You need <span className="font-bold text-white font-mono">₹{product.price - walletBalance}</span> more to purchase this plan. Please visit your profile dashboard to top-up.
+                        You need <span className="font-bold text-white font-mono">₹{finalDisplayAmount - walletBalance}</span> more to purchase this plan. Please visit your profile dashboard to top-up.
                       </div>
                     </div>
                   ) : (
@@ -564,12 +613,12 @@ export function EliteGrowthCheckout() {
                 disabled={
                   isSubmitting || 
                   (paymentMethod === 'upi' && (!utrNumber || !paymentDate || !paymentTime || hasPendingRequest)) ||
-                  (paymentMethod === 'wallet' && walletBalance < product.price)
+                  (paymentMethod === 'wallet' && walletBalance < finalDisplayAmount)
                 }
                 className={`w-full mt-8 py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
                   isSubmitting || 
                   (paymentMethod === 'upi' && (!utrNumber || !paymentDate || !paymentTime || hasPendingRequest)) ||
-                  (paymentMethod === 'wallet' && walletBalance < product.price)
+                  (paymentMethod === 'wallet' && walletBalance < finalDisplayAmount)
                     ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                     : 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] hover:shadow-[0_0_30px_rgba(249,115,22,0.6)]'
                 }`}
@@ -577,7 +626,7 @@ export function EliteGrowthCheckout() {
                 {isSubmitting ? (
                   <span className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                 ) : paymentMethod === 'wallet' ? (
-                  <>Pay ₹{product.price} with Wallet</>
+                  <>Pay ₹{finalDisplayAmount} with Wallet</>
                 ) : hasPendingRequest ? (
                   <>Payment Request Pending</>
                 ) : (
@@ -603,7 +652,46 @@ export function EliteGrowthCheckout() {
                   </div>
                 </div>
 
+                <div className="mb-6 pb-6 border-b border-gray-800">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Have a Promo Code?</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={promoCode} 
+                      onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                      disabled={!!appliedPromo || promoLoading}
+                      placeholder="Enter code" 
+                      className="flex-1 bg-black border border-gray-800 rounded-xl px-4 py-2 text-white font-mono uppercase focus:outline-none focus:border-orange-500 disabled:opacity-50"
+                    />
+                    {!appliedPromo ? (
+                      <button 
+                        type="button"
+                        onClick={handleApplyPromo}
+                        disabled={!promoCode || promoLoading}
+                        className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                      >
+                        {promoLoading ? "..." : "Apply"}
+                      </button>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => { setAppliedPromo(null); setPromoCode(""); }}
+                        className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-xl text-sm font-bold transition-colors"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {promoError && <p className="text-red-500 text-xs mt-2">{promoError}</p>}
+                  {appliedPromo && <p className="text-green-500 text-xs mt-2 font-medium">Promo code applied successfully!</p>}
+                </div>
                 <div className="space-y-4 mb-6 pb-6 border-b border-gray-800">
+                            {appliedPromo && (
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-orange-400">Discount</span>
+                      <span className="text-orange-400 font-bold">- ₹{product.price - finalDisplayAmount}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Subtotal</span>
                     <span className="text-white font-medium">₹{product.price}</span>
@@ -616,7 +704,7 @@ export function EliteGrowthCheckout() {
 
                 <div className="flex justify-between items-end mb-8">
                   <span className="text-gray-300 font-medium">Total Amount</span>
-                  <span className="text-3xl font-black text-white">₹{product.price}</span>
+                  <span className="text-3xl font-black text-white">₹{finalDisplayAmount}</span>
                 </div>
 
                 <div className="bg-black border border-gray-800 rounded-xl p-4 flex gap-3">

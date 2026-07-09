@@ -104,7 +104,7 @@ export function AdminPromoCodes() {
           <span className="w-8 h-8 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin inline-block"></span>
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-800 bg-black/50">

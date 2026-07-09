@@ -53,10 +53,12 @@ export function AdminNotifications() {
   };
 
   const deleteAll = async () => {
-    if (!confirm('Are you sure you want to delete all notifications?')) return;
+    // Remove confirm to avoid iframe blocking
     const { error } = await supabase.from('admin_notifications').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (!error) {
       setNotifications([]);
+    } else {
+      console.error(error);
     }
   };
 
