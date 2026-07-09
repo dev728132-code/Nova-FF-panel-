@@ -186,6 +186,13 @@ export function Profile() {
       if (insertError) {
         throw insertError;
       }
+      
+      try {
+        await supabase.from('admin_notifications').insert({
+          type: 'New Fund Request',
+          message: `User ${user.email} requested wallet top-up of ₹${amountNum}.`
+        });
+      } catch(e) {}
 
       toast.success('Payment request submitted. Admin has been notified!');
 

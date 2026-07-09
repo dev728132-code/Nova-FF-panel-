@@ -6,9 +6,11 @@ import { useScrollTop } from '../hooks';
 import { supabase } from '../lib/supabase';
 import { Product } from '../types';
 import { NEW_PRODUCTS } from '../data/products';
+import { useAuth } from '../contexts/AuthContext';
 
 export function BuyPanels() {
   useScrollTop();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [isBranchOpen, setIsBranchOpen] = useState(false);
@@ -46,6 +48,27 @@ export function BuyPanels() {
             }
           });
         }
+        
+        // Fetch reseller prices if user is logged in
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+          if (profile?.role === 'reseller') {
+            const { data: rPrices } = await supabase.from('reseller_prices').select('*').eq('reseller_id', user.id);
+            if (rPrices && rPrices.length > 0) {
+              const priceMap = new Map();
+              rPrices.forEach(rp => priceMap.set(rp.plan_id, rp.price));
+              
+              merged = merged.map(prod => ({
+                ...prod,
+                plans: prod.plans.map(plan => ({
+                  ...plan,
+                  price: priceMap.has(plan.id) ? priceMap.get(plan.id) : plan.price
+                }))
+              }));
+            }
+          }
+        }
+        
         setProducts(merged);
       } catch (e) {
         setProducts(NEW_PRODUCTS);
@@ -53,7 +76,7 @@ export function BuyPanels() {
       setLoading(false);
     };
     fetchProducts();
-  }, []);
+  }, [user]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(product => {

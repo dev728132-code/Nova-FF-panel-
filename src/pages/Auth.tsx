@@ -110,6 +110,15 @@ export function Auth() {
         
         if (!data.session) {
           setSuccessMessage('Account created! Please check your email to verify your account.');
+          
+          try {
+            await supabase.from('admin_notifications').insert({
+              type: 'New User',
+              message: `New user registered: ${email} (${fullName})`
+            });
+          } catch (e) {
+            console.error(e);
+          }
         }
       }
     } catch (err: any) {

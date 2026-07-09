@@ -4,7 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { Order } from '../types';
 import { useScrollTop } from '../hooks';
 import { AdminEliteProducts } from '../components/AdminEliteProducts';
-import { Shield, CheckCircle, XCircle, Clock, Wallet, Star } from 'lucide-react';
+import { AdminUsers } from '../components/admin/AdminUsers';
+import { AdminPromoCodes } from '../components/admin/AdminPromoCodes';
+import { AdminLoginHistory } from '../components/admin/AdminLoginHistory';
+import { AdminNotifications } from '../components/admin/AdminNotifications';
+import { Shield, CheckCircle, XCircle, Clock, Wallet, Star, Users, Tag, Activity, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function Admin() {
@@ -16,8 +20,9 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
-  const [adminTab, setAdminTab] = useState<'purchases' | 'funds' | 'elite_products'>('purchases');
+  const [adminTab, setAdminTab] = useState<'purchases' | 'funds' | 'elite_products' | 'users' | 'promo' | 'logins' | 'notifications'>('purchases');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null);
@@ -92,6 +97,16 @@ export function Admin() {
         setFundRequests(frData || []);
       }
 
+      // Fetch unread notifications count
+      const { count: notifCount, error: notifError } = await supabase
+        .from('admin_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_read', false);
+      
+      if (!notifError && mounted && notifCount !== null) {
+        setUnreadNotifications(notifCount);
+      }
+
       if (mounted) {
         setLoading(false);
       }
@@ -150,12 +165,29 @@ export function Admin() {
       )
       .subscribe();
 
+    // Subscribe to notifications
+    const notifChannel = supabase
+      .channel('admin_notifications_count_channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admin_notifications'
+        },
+        () => {
+          fetchOrders(); // also re-fetches notif count
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
       supabase.removeChannel(frChannel);
       supabase.removeChannel(egChannel);
+      supabase.removeChannel(notifChannel);
     };
   }, [user?.id, navigate]);
 
@@ -352,13 +384,13 @@ export function Admin() {
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-gray-800 mb-8 gap-6 text-sm">
+        <div className="flex border-b border-gray-800 mb-8 gap-6 text-sm overflow-x-auto pb-1 scrollbar-hide">
           <button
             onClick={() => {
               setAdminTab('purchases');
               setFilter('Pending');
             }}
-            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
               adminTab === 'purchases'
                 ? 'border-b-2 border-orange-500 text-orange-400'
                 : 'text-gray-500 hover:text-white'
@@ -376,7 +408,7 @@ export function Admin() {
               setAdminTab('funds');
               setFilter('Pending');
             }}
-            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
               adminTab === 'funds'
                 ? 'border-b-2 border-orange-500 text-orange-400'
                 : 'text-gray-500 hover:text-white'
@@ -393,7 +425,7 @@ export function Admin() {
             onClick={() => {
               setAdminTab('elite_products');
             }}
-            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none ${
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
               adminTab === 'elite_products'
                 ? 'border-b-2 border-orange-500 text-orange-400'
                 : 'text-gray-500 hover:text-white'
@@ -401,9 +433,74 @@ export function Admin() {
           >
             <Star className="w-4 h-4" /> Elite Products
           </button>
+          
+          <button
+            onClick={() => {
+              setAdminTab('users');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'users'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" /> Users & Resellers
+          </button>
+          
+          <button
+            onClick={() => {
+              setAdminTab('promo');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'promo'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Tag className="w-4 h-4" /> Promo Codes
+          </button>
+          
+          <button
+            onClick={() => {
+              setAdminTab('logins');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'logins'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Activity className="w-4 h-4" /> Logins
+          </button>
+
+          <button
+            onClick={() => {
+              setAdminTab('notifications');
+            }}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'notifications'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <Bell className="w-4 h-4" /> Notifications
+            {unreadNotifications > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                {unreadNotifications}
+              </span>
+            )}
+          </button>
         </div>
 
-        {adminTab === 'elite_products' ? (
+        {adminTab === 'users' ? (
+          <AdminUsers />
+        ) : adminTab === 'promo' ? (
+          <AdminPromoCodes />
+        ) : adminTab === 'logins' ? (
+          <AdminLoginHistory />
+        ) : adminTab === 'notifications' ? (
+          <AdminNotifications />
+        ) : adminTab === 'elite_products' ? (
           <AdminEliteProducts />
         ) : (
           <>

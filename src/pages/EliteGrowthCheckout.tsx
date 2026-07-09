@@ -252,6 +252,13 @@ export function EliteGrowthCheckout() {
       });
 
       if (insertError) throw insertError;
+      
+      try {
+        await supabase.from('admin_notifications').insert({
+          type: 'New VIP Order',
+          message: `New manual payment order submitted for VIP Product: ${product.name} by ${user.email}.`
+        });
+      } catch(e) {}
 
       if (!isWalletPayment) {
         toast.success('Payment request submitted. Admin has been notified!');
