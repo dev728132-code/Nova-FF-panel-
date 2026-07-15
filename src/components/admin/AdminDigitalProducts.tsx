@@ -17,7 +17,7 @@ export function AdminDigitalProducts() {
     name: '',
     short_description: '',
     full_description: '',
-    price: 0,
+    price: null,
     category: '',
     status: 'active',
     badges: [],
@@ -83,9 +83,20 @@ export function AdminDigitalProducts() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.short_description || formData.price === undefined) {
+    if (!formData.name || !formData.short_description) {
       toast.error("Please fill required fields.");
       return;
+    }
+
+    if (formData.price !== undefined && formData.price !== null) {
+      if (isNaN(formData.price)) {
+        toast.error("Please enter a valid price.");
+        return;
+      }
+      if (formData.price < 0) {
+        toast.error("Price cannot be negative.");
+        return;
+      }
     }
 
     try {
@@ -196,18 +207,39 @@ export function AdminDigitalProducts() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  const handleDelete = async (product: DigitalProduct) => {
+    if (!confirm(`Are you sure you want to delete "${product.name}"? This will also delete its uploaded assets.`)) return;
     toast.promise(
       (async () => {
-        const { error } = await supabase.from('digital_products').delete().eq('id', id);
+        // 1. Delete associated storage file if applicable
+        if (product.file_path) {
+          const { error: fileErr } = await supabase.storage
+            .from('digital-products')
+            .remove([product.file_path]);
+          if (fileErr) {
+            console.error('Error deleting product file:', fileErr);
+          }
+        }
+
+        // 2. Delete associated logo if applicable
+        if (product.logo_path) {
+          const { error: logoErr } = await supabase.storage
+            .from('product-logos')
+            .remove([product.logo_path]);
+          if (logoErr) {
+            console.error('Error deleting product logo:', logoErr);
+          }
+        }
+
+        // 3. Delete database record
+        const { error } = await supabase.from('digital_products').delete().eq('id', product.id);
         if (error) throw error;
         await fetchProducts();
       })(),
       {
         loading: 'Deleting...',
-        success: 'Product deleted',
-        error: 'Failed to delete'
+        success: 'Product deleted successfully!',
+        error: 'Failed to delete product.'
       }
     );
   };
@@ -246,7 +278,7 @@ export function AdminDigitalProducts() {
 ✔ Lifetime Updates
 ✔ Do Not Use Main ID
 ✔ Premium Digital Product`,
-        price: 0,
+        price: null,
         category: '',
         status: 'active',
         badges: [],
@@ -318,9 +350,21 @@ export function AdminDigitalProducts() {
                   <h3 className="font-bold text-lg text-white truncate">{product.name}</h3>
                   <p className="text-sm text-gray-400 truncate">{product.category || 'No Category'}</p>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="font-bold text-white text-lg">₹{product.offer_enabled && product.discount_type === 'percentage' ? (product.price - (product.price * (product.discount_value || 0) / 100)).toFixed(2) : product.offer_enabled && product.discount_type === 'flat' ? (product.price - (product.discount_value || 0)).toFixed(2) : product.price}</span>
-                    {product.offer_enabled && (
-                      <span className="text-sm text-gray-500 line-through">₹{product.price}</span>
+                    {product.price && product.price > 0 ? (
+                      <>
+                        <span className="font-bold text-white text-lg">
+                          ₹{product.offer_enabled && product.discount_type === 'percentage' 
+                            ? (product.price - (product.price * (product.discount_value || 0) / 100)).toFixed(2) 
+                            : product.offer_enabled && product.discount_type === 'flat' 
+                              ? (product.price - (product.discount_value || 0)).toFixed(2) 
+                              : product.price}
+                        </span>
+                        {product.offer_enabled && (
+                          <span className="text-sm text-gray-500 line-through">₹{product.price}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="font-extrabold text-green-500 text-lg uppercase">Free</span>
                     )}
                   </div>
                 </div>
@@ -362,7 +406,7 @@ export function AdminDigitalProducts() {
                   <CheckCircle className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => handleDelete(product.id)}
+                  onClick={() => handleDelete(product)}
                   className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors flex items-center justify-center"
                   title="Delete"
                 >
@@ -533,15 +577,23 @@ export function AdminDigitalProducts() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-300 mb-2">Base Price (₹) <span className="text-red-500">*</span></label>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">Base Price (₹) <span className="text-gray-500 text-xs">(Leave empty for Free Download)</span></label>
                       <input
                         type="number"
                         min="0"
                         step="0.01"
-                        required
-                        value={formData.price}
-                        onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
+                        value={formData.price === null || formData.price === undefined ? '' : formData.price}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === '') {
+                            setFormData({...formData, price: null});
+                          } else {
+                            const parsed = parseFloat(val);
+                            setFormData({...formData, price: isNaN(parsed) ? null : parsed});
+                          }
+                        }}
                         className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition-colors"
+                        placeholder="e.g. 499 (or leave blank)"
                       />
                     </div>
                     <div className="flex items-center">

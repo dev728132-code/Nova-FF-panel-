@@ -114,7 +114,7 @@ export type DigitalProduct = {
   name: string;
   short_description: string;
   full_description?: string;
-  price: number;
+  price?: number | null;
   category?: string;
   status: 'active' | 'hidden';
   logo_path?: string;

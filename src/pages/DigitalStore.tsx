@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { DigitalProduct } from '../types';
 import { motion } from 'motion/react';
-import { Package, Search, Star, Zap, TrendingUp, Flame, Tag, ShoppingCart } from 'lucide-react';
+import { Package, Search, Star, Zap, TrendingUp, Flame, Tag, ShoppingCart, Download } from 'lucide-react';
 import { useScrollTop } from '../hooks';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export function DigitalStore() {
   useScrollTop();
@@ -28,6 +29,32 @@ export function DigitalStore() {
     
     if (data) setProducts(data);
     setLoading(false);
+  };
+
+  const handleDownload = async (product: DigitalProduct) => {
+    if (!product.file_path) {
+      toast.error("No file is uploaded for this product yet.");
+      return;
+    }
+    const downloadPromise = (async () => {
+      const { data, error } = await supabase.storage
+        .from('digital-products')
+        .createSignedUrl(product.file_path, 3600); // 1 hour link
+      
+      if (error) throw error;
+      if (!data?.signedUrl) {
+        throw new Error("Could not retrieve download link.");
+      }
+      
+      // Open in new tab or trigger direct download
+      window.open(data.signedUrl, '_blank');
+    })();
+
+    toast.promise(downloadPromise, {
+      loading: 'Preparing download...',
+      success: 'Download started!',
+      error: (err) => 'Failed to download: ' + (err.message || 'Unknown error')
+    });
   };
 
   const filteredProducts = products.filter(p => 
@@ -117,23 +144,42 @@ export function DigitalStore() {
                   </div>
                 )}
 
-                <div className="mt-auto pt-6 border-t border-gray-800 flex items-center justify-between">
+                <div className="mt-auto pt-6 border-t border-gray-800 flex items-center justify-between gap-4">
                   <div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-white">
-                        ₹{product.offer_enabled && product.discount_type === 'percentage' ? (product.price - (product.price * (product.discount_value || 0) / 100)).toFixed(2) : product.offer_enabled && product.discount_type === 'flat' ? (product.price - (product.discount_value || 0)).toFixed(2) : product.price}
-                      </span>
-                      {product.offer_enabled && (
-                        <span className="text-gray-500 line-through text-sm font-semibold">₹{product.price}</span>
+                      {product.price && product.price > 0 ? (
+                        <>
+                          <span className="text-3xl font-black text-white">
+                            ₹{product.offer_enabled && product.discount_type === 'percentage' 
+                              ? (product.price - (product.price * (product.discount_value || 0) / 100)).toFixed(2) 
+                              : product.offer_enabled && product.discount_type === 'flat' 
+                                ? (product.price - (product.discount_value || 0)).toFixed(2) 
+                                : product.price}
+                          </span>
+                          {product.offer_enabled && (
+                            <span className="text-gray-500 line-through text-sm font-semibold">₹{product.price}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-3xl font-black text-green-500">Free</span>
                       )}
                     </div>
                   </div>
-                  <button 
-                    onClick={() => navigate('/digital-store/checkout', { state: { product } })}
-                    className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-xl flex items-center justify-center transition-transform hover:scale-105 shadow-lg shadow-orange-500/20 shrink-0"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                  </button>
+                  {product.price && product.price > 0 ? (
+                    <button 
+                      onClick={() => navigate('/digital-store/checkout', { state: { product } })}
+                      className="px-5 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-black rounded-xl flex items-center gap-2 transition-all hover:scale-105 shadow-lg shadow-orange-500/20 shrink-0 text-sm"
+                    >
+                      <ShoppingCart className="w-4 h-4" /> Buy Now
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleDownload(product)}
+                      className="px-5 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-black rounded-xl flex items-center gap-2 transition-all hover:scale-105 shadow-lg shadow-green-500/20 shrink-0 text-sm"
+                    >
+                      <Download className="w-4 h-4" /> Download
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}

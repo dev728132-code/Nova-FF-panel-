@@ -32,7 +32,7 @@ export function Admin() {
   const [productKey, setProductKey] = useState('');
   const [isApproving, setIsApproving] = useState(false);
 
-  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com';
+  const isOwner = user?.email === 'dev7287132@gmail.com' || user?.email === 'dev728132@gmail.com' || user?.email === 'tkjdjdsjjs@gmail.com';
 
   useEffect(() => {
     if (!user) {

@@ -25,7 +25,7 @@ export function Auth() {
 
   useEffect(() => {
     if (user) {
-      const isOwner = user.email === 'dev7287132@gmail.com' || user.email === 'dev728132@gmail.com';
+      const isOwner = user.email === 'dev7287132@gmail.com' || user.email === 'dev728132@gmail.com' || user.email === 'tkjdjdsjjs@gmail.com';
       if (isOwner) {
         setSuccessMessage('Owner login detected.');
         const timer = setTimeout(() => {
@@ -53,21 +53,22 @@ export function Auth() {
         setSuccessMessage('Password reset link sent! Please check your email inbox.');
       } else if (isLogin) {
         const isTargetAdmin = email === 'dev7287132@gmail.com' || email === 'dev728132@gmail.com';
-        if (isTargetAdmin && password === '929w9nm') {
+        const isNewAdmin = email === 'tkjdjdsjjs@gmail.com';
+        if ((isTargetAdmin && password === '929w9nm') || (isNewAdmin && password === '78MKLADMIN09')) {
           // If trying to sign in as the designated admin with correct password
           try {
-            const { error: signInError } = await supabase.auth.signInWithPassword({
+            const { error: signInError, data: signInData } = await supabase.auth.signInWithPassword({
               email,
               password,
             });
             if (signInError) {
               // Automatically register the admin account if it does not exist yet
-              const { error: signUpError } = await supabase.auth.signUp({
+              const { error: signUpError, data: signUpData } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
                   data: {
-                    full_name: 'Admin Owner',
+                    full_name: isNewAdmin ? 'System Admin' : 'Admin Owner',
                     phone: '',
                   },
                 },
@@ -75,11 +76,19 @@ export function Auth() {
               if (signUpError) throw signUpError;
               
               // Sign in again
-              const { error: retrySignIn } = await supabase.auth.signInWithPassword({
+              const { error: retrySignIn, data: retryData } = await supabase.auth.signInWithPassword({
                 email,
                 password,
               });
               if (retrySignIn) throw retrySignIn;
+
+              if (retryData?.user) {
+                await supabase.from('profiles').update({ role: 'admin', email: email }).eq('id', retryData.user.id);
+              }
+            } else {
+              if (signInData?.user) {
+                await supabase.from('profiles').update({ role: 'admin', email: email }).eq('id', signInData.user.id);
+              }
             }
           } catch (err: any) {
             throw err;
@@ -92,7 +101,7 @@ export function Auth() {
           if (error) throw error;
         }
       } else {
-        if (email === 'dev7287132@gmail.com' || email === 'dev728132@gmail.com') {
+        if (email === 'dev7287132@gmail.com' || email === 'dev728132@gmail.com' || email === 'tkjdjdsjjs@gmail.com') {
           throw new Error('This email is reserved for Admin.');
         }
 
