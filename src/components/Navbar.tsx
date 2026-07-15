@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, User, Shield, Crosshair } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { UserNotifications } from './UserNotifications';
+import { Search, User, Shield, Crosshair, Home, ShoppingCart, Star, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -10,6 +12,7 @@ export function Navbar() {
   const location = useLocation();
   const { user } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     // Only check if user is logged in
@@ -191,6 +194,7 @@ export function Navbar() {
   const baseLinks: NavLink[] = [
     { name: 'Home', path: '/' },
     { name: 'Buy Panels', path: '/buy' },
+    { name: 'Digital Store', path: '/digital-store' },
     { name: 'Elite Growth', path: '/elite-growth' },
     { name: 'Order History', path: '/history' },
     { name: 'Support', path: '/support' },
@@ -246,6 +250,7 @@ export function Navbar() {
             <button className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/5 transition-colors">
               <Search className="w-5 h-5" />
             </button>
+            {user && <UserNotifications />}
             <Link
               to={user ? "/profile" : "/auth"}
               className={`flex items-center justify-center w-8 h-8 rounded-full border transition-colors ${
@@ -260,49 +265,42 @@ export function Navbar() {
             {/* Mobile menu button */}
             <div className="md:hidden flex items-center">
               <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 focus:outline-none"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="text-gray-300 hover:text-white p-2 rounded-md focus:outline-none"
               >
-                {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-black border-b border-orange-500/20 overflow-hidden"
-          >
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              {links.map((link) => (
-                <Link
-                  key={link.name}
-                  to={link.path}
-                  onClick={() => setIsOpen(false)}
-                  className={`block px-3 py-2 rounded-md text-base font-medium flex items-center justify-between ${
-                    isActive(link.path)
-                      ? 'text-orange-400 bg-orange-500/10'
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800'
-                  }`}
-                >
-                  {link.name}
-                  {link.badge && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white shadow-lg">
-                      {link.badge}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mobile Menu Dropdown */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden bg-gray-900 border-b border-gray-800 animate-fade-in absolute w-full">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            {links.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block px-3 py-2 rounded-md text-base font-medium flex items-center justify-between ${
+                  isActive(link.path)
+                    ? 'text-orange-400 bg-orange-500/10'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {link.name}
+                {link.badge && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                    {link.badge}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

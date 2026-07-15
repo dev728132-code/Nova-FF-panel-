@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { User, Mail, Shield, Settings, LogOut, Smartphone, Key, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Upload, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { User, Mail, Shield, Settings, LogOut, Smartphone, Key, Wallet, PlusCircle, ArrowUpRight, ArrowDownLeft, Upload, Clock, CheckCircle, XCircle, AlertCircle, Package, ClipboardList } from 'lucide-react';
+import { OrderHistory } from './OrderHistory';
+import { ProfileDownloads } from '../components/ProfileDownloads';
 import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -220,6 +222,7 @@ export function Profile() {
   const [updateMessage, setUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Security Tab state
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -732,7 +735,7 @@ export function Profile() {
                 className="space-y-6"
               >
                 <div className="bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8">
-                  <h3 className="text-xl font-bold text-white mb-6">Security Settings</h3>
+                  <h3 className="text-xl font-bold text-white mb-6">Change Password</h3>
                   
                   {passwordMessage && (
                     <div className={`mb-6 p-4 rounded-xl text-sm font-medium ${
@@ -745,30 +748,43 @@ export function Profile() {
                   )}
 
                   <form onSubmit={handleUpdatePassword} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Current Password</label>
                         <input
                           type="password"
                           required
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
                           className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                          placeholder="At least 6 characters"
-                          minLength={6}
+                          placeholder="Enter current password"
                         />
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                          placeholder="Repeat new password"
-                          minLength={6}
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-2">New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                            placeholder="At least 6 characters"
+                            minLength={6}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-400 mb-2">Confirm New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="block w-full px-4 py-3 bg-black border border-gray-800 rounded-xl text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                            placeholder="Repeat new password"
+                            minLength={6}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end pt-2">
@@ -831,23 +847,28 @@ export function Profile() {
               </motion.div>
             )}
 
-            {activeTab === 'preferences' && (
+                        {activeTab === 'preferences' && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8 space-y-6"
+                className="bg-gray-900 border border-gray-800 rounded-3xl p-6 md:p-8"
               >
-                <div>
-                  <h3 className="text-xl font-bold text-white mb-2">Account Preferences</h3>
-                  <p className="text-xs text-gray-500">Configure your panel management preferences and notifications.</p>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-orange-500" />
+                      App Preferences
+                    </h3>
+                    <p className="text-gray-400 text-sm mt-1">Customize your platform experience</p>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-4 bg-black border border-gray-800 rounded-2xl">
                     <div>
                       <p className="text-white font-semibold text-sm">Marketing Emails</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Receive notifications about newly released panels and seasonal discount events.</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Receive occasional promotional offers and discounts.</p>
                     </div>
                     <button
                       onClick={() => setPrefPromo(!prefPromo)}
@@ -921,7 +942,7 @@ export function Profile() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2 border-t border-gray-800">
+                <div className="flex justify-end pt-2 border-t border-gray-800 mt-6">
                   <button
                     onClick={() => {
                       const toast = document.createElement('div');
@@ -937,8 +958,9 @@ export function Profile() {
                 </div>
               </motion.div>
             )}
-          </div>
 
+
+          </div>
         </div>
       </div>
     </div>

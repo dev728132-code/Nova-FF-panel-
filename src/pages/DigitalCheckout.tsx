@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
-export function Checkout() {
+export function DigitalCheckout() {
   useScrollTop();
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export function Checkout() {
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState('');
 
-  const state = location.state as { product: Product; selectedPlan: Plan } | null;
+  const state = location.state as { product: any } | null;
 
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   
@@ -202,8 +202,10 @@ export function Checkout() {
     );
   }
 
-  const { product, selectedPlan } = state;
-  const finalDisplayAmount = Math.max(0, selectedPlan.price - (appliedPromo ? (appliedPromo.discount_percentage ? (selectedPlan.price * appliedPromo.discount_percentage / 100) : (appliedPromo.fixed_discount || 0)) : 0));
+  const { product } = state;
+  const basePrice = product.offer_enabled && product.discount_type === 'percentage' ? (product.price - (product.price * (product.discount_value || 0) / 100)) : product.offer_enabled && product.discount_type === 'flat' ? (product.price - (product.discount_value || 0)) : product.price;
+  const finalDisplayAmount = Math.max(0, basePrice - (appliedPromo ? (appliedPromo.discount_percentage ? (basePrice * appliedPromo.discount_percentage / 100) : (appliedPromo.fixed_discount || 0)) : 0));
+  
 
   const upiId = "7563075001@ybl";
   const merchantName = "FF Store";
@@ -253,45 +255,8 @@ export function Checkout() {
         screenshotUrl = publicUrlData.publicUrl;
       }
 
-      // 1. Before creating an order, verify that the selected product or compatible products exist in the products table
-      const { data: dbProducts, error: dbProductsError } = await supabase
-        .from('products')
-        .select('id, name');
-
-      if (dbProductsError || !dbProducts || dbProducts.length === 0) {
-        alert("The product verification system is currently offline or the product was not found in our database. Please select a different product or contact support.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Check if our selected product ID is in the database products
-      let finalProductId = product.id;
-      const exactMatch = dbProducts.find(p => p.id === product.id);
-
-      if (!exactMatch) {
-        // Find a matching/appropriate database product ID based on category/name
-        const pCategory = (product.category || '').toLowerCase();
-        let matchedDbProduct = null;
-
-        if (pCategory.includes('pc')) {
-          matchedDbProduct = dbProducts.find(p => p.id.includes('pc') || p.name.toLowerCase().includes('pc'));
-        } else if (pCategory.includes('root')) {
-          matchedDbProduct = dbProducts.find(p => p.id.includes('root') || p.name.toLowerCase().includes('root'));
-        } else if (pCategory.includes('nonroot') || pCategory.includes('non-root')) {
-          matchedDbProduct = dbProducts.find(p => p.id.includes('non-root') || p.id.includes('nonroot') || p.name.toLowerCase().includes('non-root'));
-        }
-
-        // Fallback to the first available product in the database if no category-specific match is found
-        const resolvedProduct = matchedDbProduct || dbProducts[0];
-        
-        if (!resolvedProduct) {
-          alert("The selected product could not be mapped to any active database catalog items. Please select a different product or contact support.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        finalProductId = resolvedProduct.id;
-      }
+      // Bypass product DB check for digital products
+      let finalProductId = state.product.id;
 
       // Fetch user profile name
       let customerName = user.user_metadata?.full_name || 'Anonymous User';
@@ -312,7 +277,7 @@ export function Checkout() {
       const pTime = isWalletPayment ? new Date().toTimeString().split(' ')[0].substring(0, 5) : paymentTime;
 
       // Calculate final amount after promo
-      let finalAmount = selectedPlan.price;
+      let finalAmount = state.product.offer_enabled && state.product.discount_type === 'percentage' ? (state.product.price - (state.product.price * (state.product.discount_value || 0) / 100)) : state.product.offer_enabled && state.product.discount_type === 'flat' ? (state.product.price - (state.product.discount_value || 0)) : state.product.price;
       if (appliedPromo) {
         if (appliedPromo.discount_percentage) {
           finalAmount -= finalAmount * (appliedPromo.discount_percentage / 100);
@@ -325,13 +290,13 @@ export function Checkout() {
 
       const { data: insertedOrder, error: insertError } = await supabase.from('orders').insert({
         user_id: user.id,
-        product_id: finalProductId,
-        product_name: product.name,
-        plan_duration: selectedPlan.duration,
+        product_id: state.product.id,
+        product_name: state.product.name,
+        plan_duration: 'Lifetime',
         amount: finalAmount,
         payment_status: isWalletPayment ? 'Verified' : 'Pending',
         order_status: isWalletPayment ? 'Completed' : 'Pending',
-        expiry_date: new Date(Date.now() + parseInt(selectedPlan.duration.split(' ')[0]) * 24 * 60 * 60 * 1000).toISOString(),
+        expiry_date: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
         payment_screenshot_url: screenshotUrl,
         utr_number: isWalletPayment ? 'wallet_payment' : utrNumber,
         payment_date: pDate,
@@ -368,8 +333,18 @@ export function Checkout() {
         });
       } catch(e) {}
 
+      
       if (isWalletPayment && insertedOrder) {
-        try {
+         // It's already verified via wallet, grant access immediately
+         await supabase.from('digital_purchases').insert({
+             user_id: user.id,
+             product_id: state.product.id,
+             order_id: insertedOrder.id,
+             amount: finalAmount
+         });
+         
+         // Try to hit reseller API (if needed) but catch errors
+         try {
           const res = await fetch("/api/reseller/buy", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -377,7 +352,7 @@ export function Checkout() {
               orderId: insertedOrder.id,
               isElite: false,
               product_id: product.id,
-              duration: selectedPlan.duration,
+              duration: 'Lifetime',
               user_id: user.id,
               payment_id: "wallet_payment"
             })
@@ -490,7 +465,7 @@ export function Checkout() {
                   <div className="bg-black border border-orange-500/30 rounded-xl p-6 mb-8 text-center relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-red-500/5" />
                     <div className="mb-4 relative z-10 space-y-1">
-                      <p className="text-sm text-gray-400">Product: <span className="text-white font-bold">{product.name} ({selectedPlan.duration})</span></p>
+                      <p className="text-sm text-gray-400">Product: <span className="text-white font-bold">{product.name} </span></p>
                       <p className="text-sm text-gray-400">Amount: <span className="text-orange-500 font-bold">₹{finalDisplayAmount}</span></p>
                     </div>
                     <div className="w-full border-t border-gray-800/50 my-3 relative z-10" />
@@ -662,10 +637,14 @@ export function Checkout() {
               <h3 className="text-xl font-bold text-white mb-6">Order Summary</h3>
               
               <div className="flex gap-4 mb-6 pb-6 border-b border-gray-800">
-                <img src={product.image} alt={product.name} className="w-20 h-20 rounded-lg object-cover" />
+                {product.logo_path ? (
+                  <div className="w-20 h-20 rounded-lg object-cover overflow-hidden"><CheckoutLogo path={product.logo_path} /></div>
+                ) : (
+                  <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0"><PlaceholderThumbnail name={product.name} size="sm" /></div>
+                )}
                 <div>
                   <h4 className="font-bold text-white mb-1 leading-tight">{product.name}</h4>
-                  <p className="text-xs text-orange-500 font-medium">{selectedPlan.duration} Plan</p>
+                  <p className="text-xs text-orange-500 font-medium">Digital Product</p>
                 </div>
               </div>
 
@@ -707,7 +686,7 @@ export function Checkout() {
               <div className="space-y-4 mb-6 pb-6 border-b border-gray-800">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white font-medium">₹{selectedPlan.price}</span>
+                  <span className="text-white font-medium">₹{basePrice}</span>
                 </div>
                 {appliedPromo && (
                   <div className="flex justify-between text-sm">
@@ -726,7 +705,7 @@ export function Checkout() {
               <div className="flex justify-between items-end mb-8">
                 <span className="text-gray-300 font-medium">Total Amount</span>
                 <span className="text-3xl font-black text-white">
-                  ₹{Math.max(0, selectedPlan.price - (appliedPromo ? (appliedPromo.discount_percentage ? (selectedPlan.price * appliedPromo.discount_percentage / 100) : (appliedPromo.fixed_discount || 0)) : 0))}
+                  ₹{finalDisplayAmount}
                 </span>
               </div>
 
@@ -742,6 +721,42 @@ export function Checkout() {
 
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// Helper component to load logo async
+function CheckoutLogo({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.storage.from('product-logos').createSignedUrl(path, 3600).then(({ data }) => {
+      if (data) setUrl(data.signedUrl);
+    });
+  }, [path]);
+
+  if (!url) return <div className="w-full h-full bg-gray-800 animate-pulse rounded-lg" />;
+  return <img src={url} alt="Logo" className="w-full h-full object-cover rounded-lg" />;
+}
+
+function PlaceholderThumbnail({ name, size = 'sm' }: { name: string, size?: 'sm' | 'lg' }) {
+  const words = name.split(' ');
+  const initials = words.slice(0, 2).map(w => w[0]).join('').toUpperCase().substring(0, 2);
+  
+  return (
+    <div className="w-full h-full bg-gradient-to-br from-gray-900 via-black to-gray-950 flex flex-col items-center justify-center relative overflow-hidden group">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-orange-500/20 via-transparent to-transparent opacity-40"></div>
+      <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%,transparent_100%)] bg-[length:4px_4px]"></div>
+
+      {size === 'sm' ? (
+        <span className="font-black text-2xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-gray-100 to-gray-500 z-10 drop-shadow-lg">{initials}</span>
+      ) : (
+        <>
+          <span className="font-black text-3xl tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-gray-100 to-gray-500 z-10 drop-shadow-lg mb-1">{initials}</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest z-10 px-2 text-center truncate w-full">{name}</span>
+        </>
+      )}
     </div>
   );
 }

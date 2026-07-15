@@ -71,13 +71,30 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
   };
 
   const handlePriceChange = (planId: string, price: string) => {
-    setPrices({ ...prices, [planId]: Number(price) });
+    if (price === "") {
+      const newPrices = { ...prices };
+      delete newPrices[planId];
+      setPrices(newPrices);
+    } else {
+      setPrices({ ...prices, [planId]: Number(price) });
+    }
   };
 
   const handleSave = async () => {
     setSaving(true);
     
-    // Convert map to array of records
+    // First delete all existing prices for this reseller
+    const { error: deleteError } = await supabase
+      .from('reseller_prices')
+      .delete()
+      .eq('reseller_id', reseller.id);
+
+    if (deleteError) {
+      alert('Error clearing old prices: ' + deleteError.message);
+      setSaving(false);
+      return;
+    }
+
     const updates = Object.keys(prices).map(planId => ({
       reseller_id: reseller.id,
       plan_id: planId,
@@ -87,8 +104,8 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
     if (updates.length > 0) {
       const { error } = await supabase
         .from('reseller_prices')
-        .upsert(updates, { onConflict: 'reseller_id,plan_id' });
-        
+        .insert(updates);
+      
       if (error) {
         alert('Error saving prices: ' + error.message);
       } else {
@@ -98,10 +115,15 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
       }
+    } else {
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-5 right-5 bg-green-500 text-white font-bold px-5 py-3 rounded-xl shadow-2xl z-50 animate-fade-in text-sm border border-green-400/30';
+      toast.innerText = 'Reset to default prices!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
     }
     setSaving(false);
   };
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-4 mb-6">
@@ -146,7 +168,7 @@ export function AdminResellerPrices({ reseller, onBack }: Props) {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500 font-bold">₹</span>
                         <input
                           type="number"
-                          value={prices[plan.id] || ''}
+                          value={prices[plan.id] !== undefined ? prices[plan.id] : ''}
                           onChange={(e) => handlePriceChange(plan.id, e.target.value)}
                           placeholder={(Math.floor(plan.price * 0.5)).toString()}
                           className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-orange-500 font-mono font-bold"

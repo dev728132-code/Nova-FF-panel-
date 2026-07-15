@@ -8,6 +8,8 @@ import { AdminUsers } from '../components/admin/AdminUsers';
 import { AdminPromoCodes } from '../components/admin/AdminPromoCodes';
 import { AdminLoginHistory } from '../components/admin/AdminLoginHistory';
 import { AdminNotifications } from '../components/admin/AdminNotifications';
+import { AdminSentMessages } from '../components/admin/AdminSentMessages';
+import { AdminDigitalProducts } from '../components/admin/AdminDigitalProducts';
 import { Shield, CheckCircle, XCircle, Clock, Wallet, Star, Users, Tag, Activity, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,7 +22,7 @@ export function Admin() {
   const [loading, setLoading] = useState(true);
   const [showOwnerAlert, setShowOwnerAlert] = useState(true);
 
-  const [adminTab, setAdminTab] = useState<'purchases' | 'funds' | 'elite_products' | 'users' | 'promo' | 'logins' | 'notifications'>('purchases');
+  const [adminTab, setAdminTab] = useState<'purchases' | 'funds' | 'elite_products' | 'users' | 'promo' | 'logins' | 'notifications' | 'sent_messages' | 'digital_products'>('purchases');
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Verified' | 'Rejected'>('Pending');
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   
@@ -76,7 +78,8 @@ export function Admin() {
             ...eo,
             purchase_date: eo.created_at,
             plan_duration: 'Lifetime',
-            is_elite_growth_table: true
+            is_elite_growth_table: true,
+            payment_screenshot_url: eo.screenshot_url || eo.payment_screenshot_url
           }));
           mergedOrders = [...mergedOrders, ...egFormatted];
         }
@@ -211,8 +214,32 @@ export function Admin() {
     setErrorMessage(null);
 
     const isApprove = modalType === 'approve';
-    const noteOrKey = productKey.trim();
+    let noteOrKey = productKey.trim();
 
+    if (isApprove && !selectedOrder.is_fund_request_table) {
+      try {
+        const res = await fetch("/api/reseller/buy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: selectedOrder.id,
+            isElite: !!selectedOrder.is_elite_growth_table,
+            product_id: selectedOrder.product_id,
+            duration: selectedOrder.plan_duration || "Elite Growth",
+            user_id: selectedOrder.user_id,
+            payment_id: selectedOrder.utr_number || "admin_verify"
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.deliveryData) {
+           noteOrKey = data.deliveryData;
+        } else {
+           alert("Reseller API Warning: " + (data.error || "Failed to fetch key. Check logs."));
+        }
+      } catch(e) {
+        console.error("Reseller API Error", e);
+      }
+    }
     try {
       if (selectedOrder.is_fund_request_table) {
         // Update fund_requests table
@@ -234,7 +261,7 @@ export function Admin() {
         setFundRequests(prev => prev.map(fr =>
           fr.id === selectedOrder.id ? { ...fr, status: statusVal, admin_note: noteOrKey || defaultNote } : fr
         ));
-      } else if (selectedOrder.is_elite_growth_table) {
+        } else if (selectedOrder.is_elite_growth_table) {
         // Update elite_growth_orders table
         const pStatus = isApprove ? 'Verified' : 'Rejected';
         const oStatus = isApprove ? 'Completed' : 'Failed';
@@ -370,7 +397,27 @@ export function Admin() {
             <button onClick={() => setShowOwnerAlert(false)} className="text-green-500 hover:text-green-400 text-xs font-bold font-mono">
               [DISMISS]
             </button>
-          </div>
+          <button
+            onClick={() => setAdminTab('sent_messages')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'sent_messages'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Sent Messages
+          </button>
+          <button
+            onClick={() => setAdminTab('digital_products')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'digital_products'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Digital Products
+          </button>
+        </div>
         )}
 
         <div className="flex items-center gap-3 mb-8">
@@ -484,11 +531,54 @@ export function Admin() {
             }`}
           >
             <Bell className="w-4 h-4" /> Notifications
+          </button>
+
+          <button
+
+            onClick={() => {
+
+              setAdminTab('sent_messages');
+
+            }}
+
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+
+              adminTab === 'sent_messages'
+
+                ? 'border-b-2 border-orange-500 text-orange-400'
+
+                : 'text-gray-500 hover:text-white'
+
+            }`}
+
+          >
+
+            
             {unreadNotifications > 0 && (
               <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                 {unreadNotifications}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setAdminTab('sent_messages')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'sent_messages'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Sent Messages
+          </button>
+          <button
+            onClick={() => setAdminTab('digital_products')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'digital_products'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Digital Products
           </button>
         </div>
 
@@ -498,10 +588,15 @@ export function Admin() {
           <AdminPromoCodes />
         ) : adminTab === 'logins' ? (
           <AdminLoginHistory />
+                ) : adminTab === 'sent_messages' ? (
+          <AdminSentMessages />
         ) : adminTab === 'notifications' ? (
+        
           <AdminNotifications />
-        ) : adminTab === 'elite_products' ? (
+                ) : adminTab === 'elite_products' ? (
           <AdminEliteProducts />
+        ) : adminTab === 'digital_products' ? (
+          <AdminDigitalProducts />
         ) : (
           <>
             <div className="flex items-center gap-2 mb-6">
@@ -724,7 +819,27 @@ export function Admin() {
                   'Send & Reject'
                 )}
               </button>
-            </div>
+          <button
+            onClick={() => setAdminTab('sent_messages')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'sent_messages'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Sent Messages
+          </button>
+          <button
+            onClick={() => setAdminTab('digital_products')}
+            className={`pb-4 font-bold transition-all relative flex items-center gap-2 focus:outline-none whitespace-nowrap ${
+              adminTab === 'digital_products'
+                ? 'border-b-2 border-orange-500 text-orange-400'
+                : 'text-gray-500 hover:text-white'
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> Digital Products
+          </button>
+        </div>
           </div>
         </div>
       )}

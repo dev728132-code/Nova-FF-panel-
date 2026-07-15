@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Star, Plus, Edit2, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Star, Plus, Edit2, Trash2, Eye, EyeOff, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export function AdminEliteProducts() {
   const [products, setProducts] = useState<any[]>([]);
@@ -26,20 +27,41 @@ export function AdminEliteProducts() {
     setLoading(false);
   };
 
-  const handleSave = async () => {
-    if (editingProduct) {
-      await supabase.from('elite_growth_products').update(formData).eq('id', editingProduct.id);
+  
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
     } else {
-      await supabase.from('elite_growth_products').insert([formData]);
+      document.body.style.overflow = '';
     }
-    setIsModalOpen(false);
-    fetchProducts();
+    return () => { document.body.style.overflow = ''; };
+  }, [isModalOpen]);
+
+    const handleSave = async () => {
+    try {
+      if (editingProduct) {
+        await supabase.from('elite_growth_products').update(formData).eq('id', editingProduct.id);
+        toast.success('Product updated successfully!');
+      } else {
+        await supabase.from('elite_growth_products').insert([formData]);
+        toast.success('Product created successfully!');
+      }
+      setIsModalOpen(false);
+      fetchProducts();
+    } catch (error: any) {
+      toast.error(error.message || 'Error saving product');
+    }
   };
 
-  const handleDelete = async (id: string) => {
+    const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this product?')) {
-      await supabase.from('elite_growth_products').delete().eq('id', id);
-      fetchProducts();
+      try {
+        await supabase.from('elite_growth_products').delete().eq('id', id);
+        toast.success('Product deleted successfully');
+        fetchProducts();
+      } catch (error: any) {
+        toast.error('Failed to delete product');
+      }
     }
   };
 
@@ -85,30 +107,45 @@ export function AdminEliteProducts() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-900 p-6 rounded-2xl max-w-md w-full">
-            <h3 className="text-xl font-bold text-white mb-4">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
-            <div className="space-y-4 text-sm">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-6">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] animate-fade-in">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-6 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur z-10 rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white">{editingProduct ? 'Edit Product' : 'Add Product'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white transition-colors p-2 -mr-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Modal Body (Scrollable) */}
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-4 text-sm">
               <div>
-                <label className="block text-gray-400 mb-1">Name</label>
-                <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-2 bg-black border border-gray-800 rounded-lg text-white" />
+                <label className="block text-gray-400 mb-1 font-medium">Name <span className="text-red-500">*</span></label>
+                <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full p-3 bg-black border border-gray-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 rounded-xl text-white outline-none transition-all" placeholder="Product name" />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1">Price (₹)</label>
-                <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full p-2 bg-black border border-gray-800 rounded-lg text-white" />
+                <label className="block text-gray-400 mb-1 font-medium">Price (₹) <span className="text-red-500">*</span></label>
+                <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="w-full p-3 bg-black border border-gray-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 rounded-xl text-white outline-none transition-all" placeholder="0" />
               </div>
               <div>
-                <label className="block text-gray-400 mb-1">Image URL</label>
-                <input value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="w-full p-2 bg-black border border-gray-800 rounded-lg text-white" />
+                <label className="block text-gray-400 mb-1 font-medium">Image URL</label>
+                <div className="flex gap-4">
+                  {formData.image_url && (
+                    <img src={formData.image_url} alt="Preview" className="w-12 h-12 rounded-lg object-cover bg-black shrink-0 border border-gray-800" onError={(e) => (e.currentTarget.style.display = 'none')} onLoad={(e) => (e.currentTarget.style.display = 'block')} />
+                  )}
+                  <input value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} className="flex-1 w-full p-3 bg-black border border-gray-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 rounded-xl text-white outline-none transition-all" placeholder="https://..." />
+                </div>
               </div>
               <div>
-                <label className="block text-gray-400 mb-1">Description</label>
-                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-2 bg-black border border-gray-800 rounded-lg text-white" rows={3} />
+                <label className="block text-gray-400 mb-1 font-medium">Description</label>
+                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-3 bg-black border border-gray-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 rounded-xl text-white outline-none transition-all resize-none" rows={3} placeholder="Product description..." />
               </div>
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-800 text-white rounded-lg flex-1">Cancel</button>
-                <button onClick={handleSave} className="px-4 py-2 bg-orange-500 text-white font-bold rounded-lg flex-1">Save</button>
-              </div>
+            </div>
+            
+            {/* Modal Footer (Sticky) */}
+            <div className="p-4 sm:p-6 border-t border-gray-800 bg-gray-900 sticky bottom-0 z-10 rounded-b-2xl flex gap-3">
+              <button onClick={() => setIsModalOpen(false)} className="px-4 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl flex-1 transition-colors">Cancel</button>
+              <button onClick={handleSave} disabled={!formData.name || formData.price <= 0} className="px-4 py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl flex-1 transition-colors shadow-lg shadow-orange-500/20">Save Product</button>
             </div>
           </div>
         </div>

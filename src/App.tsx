@@ -10,6 +10,8 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
 import { BuyPanels } from './pages/BuyPanels';
+import { DigitalStore } from './pages/DigitalStore';
+import { DigitalCheckout } from './pages/DigitalCheckout';
 import { EliteGrowth } from './pages/EliteGrowth';
 import { EliteGrowthCheckout } from './pages/EliteGrowthCheckout';
 import { Checkout } from './pages/Checkout';
@@ -33,7 +35,7 @@ function AppContent() {
   if (!user) {
     return (
       <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30">
-        <main>
+        <main className="pb-20 md:pb-0">
           <Routes>
             <Route path="*" element={<Auth />} />
           </Routes>
@@ -45,11 +47,13 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-orange-500/30 font-sans">
       <Navbar />
-      <main>
+      <main className="pb-20 md:pb-0">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/buy" element={<BuyPanels />} />
+          <Route path="/digital-store" element={<DigitalStore />} />
+          <Route path="/digital-store/checkout" element={<DigitalCheckout />} />
           <Route path="/elite-growth" element={<EliteGrowth />} />
           <Route path="/elite-growth/checkout" element={<EliteGrowthCheckout />} />
           <Route path="/checkout" element={<Checkout />} />

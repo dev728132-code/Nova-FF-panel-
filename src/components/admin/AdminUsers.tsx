@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { Profile } from '../../types';
 import { Users, Search, Shield, Ban, CheckCircle, Clock } from 'lucide-react';
 import { AdminResellerPrices } from './AdminResellerPrices';
+import { SendMessageModal } from './SendMessageModal';
+import { MessageSquare } from 'lucide-react';
 
 export function AdminUsers() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -10,6 +12,7 @@ export function AdminUsers() {
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [view, setView] = useState<'list' | 'prices'>('list');
+  const [messageUser, setMessageUser] = useState<Profile | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -177,6 +180,11 @@ export function AdminUsers() {
                 )}
 
                 {user.status !== 'suspended' && (
+                  <button onClick={() => setMessageUser(user)} className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-500 border border-blue-500/30 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1">
+                    <MessageSquare className="w-4 h-4" /> Message
+                  </button>
+                )}
+                {user.status !== 'suspended' && (
                   <button onClick={() => {
                     const days = prompt('Enter number of days to suspend this user:');
                     if (days && !isNaN(Number(days))) {
@@ -205,6 +213,13 @@ export function AdminUsers() {
             </div>
           )}
         </div>
+      )}
+      {messageUser && (
+        <SendMessageModal 
+          user={messageUser}
+          onClose={() => setMessageUser(null)}
+          onSuccess={() => setMessageUser(null)}
+        />
       )}
     </div>
   );

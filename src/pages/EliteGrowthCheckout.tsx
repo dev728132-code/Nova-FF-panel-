@@ -276,11 +276,11 @@ export function EliteGrowthCheckout() {
           payment_time: pTime,
           customer_name: customerName,
           customer_email: user.email
-        });
+      }).select().single();
         if (orderError) throw orderError;
       }
 
-      const { error: insertError } = await supabase.from('elite_growth_orders').insert({
+      const { data: insertedOrder, error: insertError } = await supabase.from('elite_growth_orders').insert({
         user_id: user.id,
         product_id: product.id,
         product_name: product.name,
@@ -289,7 +289,7 @@ export function EliteGrowthCheckout() {
         order_status: isWalletPayment ? 'Completed' : 'Pending',
         screenshot_url: screenshotUrl,
         utr_number: isWalletPayment ? 'wallet_payment' : utrNumber,
-      });
+      }).select().single();
 
       if (insertError) throw insertError;
 
@@ -309,6 +309,27 @@ export function EliteGrowthCheckout() {
         });
       } catch(e) {}
 
+      if (isWalletPayment && insertedOrder) {
+        try {
+          const res = await fetch("/api/reseller/buy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId: insertedOrder.id,
+              isElite: true,
+              product_id: product.id,
+              duration: "Elite Growth",
+              user_id: user.id,
+              payment_id: "wallet_payment"
+            })
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "Failed to fetch product key");
+        } catch (e: any) {
+          console.error("Reseller API Error:", e);
+          toast.error("Order placed, but failed to deliver key. Support has been notified.");
+        }
+      }
       if (!isWalletPayment) {
         toast.success('Payment request submitted. Admin has been notified!');
       }

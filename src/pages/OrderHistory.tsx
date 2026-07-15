@@ -6,8 +6,8 @@ import { useScrollTop } from '../hooks';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-export function OrderHistory() {
-  useScrollTop();
+export function OrderHistory({ isTab = false }: { isTab?: boolean }) {
+  if (!isTab) useScrollTop();
   const { user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -154,15 +154,15 @@ export function OrderHistory() {
   };
 
   return (
-    <div className="pt-24 pb-20 min-h-screen bg-black">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className={isTab ? "pb-10" : "pt-24 pb-20 min-h-screen bg-black"}>
+      <div className={isTab ? "" : "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8"}>
         
-        <div className="mb-10">
+        {!isTab && <div className="mb-10">
           <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">
             Order <span className="text-orange-500">History</span>
           </h1>
           <p className="text-gray-400">Track and manage your purchased panels.</p>
-        </div>
+        </div>}
 
         {/* Controls */}
         <div className="flex flex-col md:flex-row gap-4 mb-8">

@@ -1,4 +1,12 @@
-import { Product } from '../types';
+const fs = require('fs');
+
+let content = fs.readFileSync('src/data/products.ts', 'utf8');
+
+// We want to replace the `plans: [...]` for each product to standard 5 plans.
+// To do this reliably, we can parse the TypeScript if we strip types, or just use regex carefully.
+// Wait, we can rewrite the entire products array.
+
+const productsFile = `import { Product } from '../types';
 
 export const NEW_PRODUCTS: Product[] = [
   {
@@ -174,10 +182,14 @@ export const NEW_PRODUCTS: Product[] = [
 // Add standardized plans to all products
 NEW_PRODUCTS.forEach(p => {
   p.plans = [
-    { id: `plan-${p.id}-1d`, duration: "1 Day", price: 100 },
-    { id: `plan-${p.id}-3d`, duration: "3 Days", price: 250 },
-    { id: `plan-${p.id}-7d`, duration: "7 Days", price: 500 },
-    { id: `plan-${p.id}-15d`, duration: "15 Days", price: 900 },
-    { id: `plan-${p.id}-30d`, duration: "30 Days", price: 1500 }
+    { id: \`plan-\${p.id}-1d\`, duration: "1 Day", price: 100 },
+    { id: \`plan-\${p.id}-3d\`, duration: "3 Days", price: 250 },
+    { id: \`plan-\${p.id}-7d\`, duration: "7 Days", price: 500 },
+    { id: \`plan-\${p.id}-15d\`, duration: "15 Days", price: 900 },
+    { id: \`plan-\${p.id}-30d\`, duration: "30 Days", price: 1500 }
   ];
 });
+`;
+
+fs.writeFileSync('src/data/products.ts', productsFile);
+console.log("Updated products.ts");

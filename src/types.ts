@@ -11,7 +11,7 @@ export type Product = {
   category?: string;
   features: string[];
   image: string;
-  plans: Plan[];
+  plans?: Plan[];
 };
 
 export type OrderStatus = 'Pending' | 'Completed' | 'Failed' | 'Approved' | 'Success';
@@ -93,4 +93,49 @@ export type Order = {
   customer_name?: string;
   customer_email?: string;
   product_key?: string;
+};
+
+export type UserMessage = {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  expires_at: string | null;
+  created_at: string;
+  profiles?: {
+    full_name: string;
+    email: string;
+  };
+};
+
+export type DigitalProduct = {
+  id: string;
+  name: string;
+  short_description: string;
+  full_description?: string;
+  price: number;
+  category?: string;
+  status: 'active' | 'hidden';
+  logo_path?: string;
+  file_path?: string;
+  file_name?: string;
+  file_size?: number;
+  file_type?: string;
+  badges: string[];
+  is_pinned: boolean;
+  offer_enabled: boolean;
+  discount_type?: 'percentage' | 'flat';
+  discount_value?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DigitalPurchase = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  order_id?: string;
+  amount: number;
+  purchased_at: string;
 };

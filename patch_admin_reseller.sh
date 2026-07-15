@@ -1,0 +1,1 @@
+sed -i 's/setPrices({ ...prices, \[planId\]: Number(price) });/if (price === "") {\n      const newPrices = { ...prices };\n      delete newPrices[planId];\n      setPrices(newPrices);\n    } else {\n      setPrices({ ...prices, [planId]: Number(price) });\n    }/g' src/components/admin/AdminResellerPrices.tsx
